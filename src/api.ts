@@ -519,6 +519,89 @@ api.post("/progress", (req, res) => {
   res.json({ ok: true, completed: done === 1 });
 });
 
+// ---------- Anotações ----------
+// Notas do curso: lista sem o blob do desenho (só a flag hasDrawing)
+api.get("/courses/:id/notes", (req, res) => {
+  if (!courseExists(req.params.id)) return res.status(404).json({ error: "Curso não encontrado" });
+  const rows = db
+    .prepare(
+      `SELECT n.id, n.lesson_id AS lessonId, n.time_sec AS timeSec, n.text,
+              n.created_at AS createdAt, n.updated_at AS updatedAt,
+              (n.drawing IS NOT NULL) AS hasDrawing, l.title AS lessonTitle
+       FROM notes n LEFT JOIN lessons l ON l.id = n.lesson_id
+       WHERE n.course_id = ?
+       ORDER BY (n.lesson_id IS NOT NULL), l.section_order, l.sort_order, n.time_sec, n.created_at`
+    )
+    .all(req.params.id) as unknown as Record<string, unknown>[];
+  res.json(rows.map((r) => ({ ...r, hasDrawing: Boolean(r.hasDrawing) })));
+});
+
+api.post("/courses/:id/notes", (req, res) => {
+  if (!courseExists(req.params.id)) return res.status(404).json({ error: "Curso não encontrado" });
+  const { lessonId, timeSec, text } = req.body as { lessonId?: string; timeSec?: number; text?: string };
+  if (lessonId) {
+    const lesson = db.prepare("SELECT course_id FROM lessons WHERE id = ?").get(lessonId) as
+      | { course_id: string }
+      | undefined;
+    if (!lesson || lesson.course_id !== req.params.id)
+      return res.status(404).json({ error: "Aula não encontrada neste curso" });
+  }
+  const id = crypto.randomUUID();
+  db.prepare(
+    `INSERT INTO notes (id, course_id, lesson_id, time_sec, text, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+  ).run(
+    id,
+    req.params.id,
+    lessonId ?? null,
+    lessonId && timeSec != null ? Math.max(0, Number(timeSec) || 0) : null,
+    typeof text === "string" ? text : ""
+  );
+  res.json({ ok: true, id });
+});
+
+api.put("/notes/:id", (req, res) => {
+  const { text } = req.body as { text?: string };
+  const r = db
+    .prepare("UPDATE notes SET text = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(typeof text === "string" ? text : "", req.params.id);
+  if (r.changes === 0) return res.status(404).json({ error: "Nota não encontrada" });
+  res.json({ ok: true });
+});
+
+api.delete("/notes/:id", (req, res) => {
+  db.prepare("DELETE FROM notes WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// desenho por cima do texto (PNG achatado, corpo raw como o banner)
+api.put("/notes/:id/drawing", raw({ type: "image/*", limit: "15mb" }), (req, res) => {
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0)
+    return res.status(400).json({ error: "Envie a imagem no corpo da requisição (Content-Type image/*)" });
+  const r = db
+    .prepare("UPDATE notes SET drawing = ?, drawing_mime = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(req.body, req.headers["content-type"] ?? "image/png", req.params.id);
+  if (r.changes === 0) return res.status(404).json({ error: "Nota não encontrada" });
+  res.json({ ok: true });
+});
+
+api.get("/notes/:id/drawing", (req, res) => {
+  const row = db.prepare("SELECT drawing, drawing_mime FROM notes WHERE id = ?").get(req.params.id) as
+    | { drawing: Uint8Array | null; drawing_mime: string | null }
+    | undefined;
+  if (!row || !row.drawing) return res.status(404).end();
+  res.setHeader("Content-Type", row.drawing_mime ?? "image/png");
+  res.send(Buffer.from(row.drawing));
+});
+
+api.delete("/notes/:id/drawing", (req, res) => {
+  const r = db
+    .prepare("UPDATE notes SET drawing = NULL, drawing_mime = NULL, updated_at = datetime('now') WHERE id = ?")
+    .run(req.params.id);
+  if (r.changes === 0) return res.status(404).json({ error: "Nota não encontrada" });
+  res.json({ ok: true });
+});
+
 // ---------- Rescan ----------
 api.post("/scan", (_req, res) => {
   const result = scanLibrary();

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { apiGet, CourseDetail, fmtDuration, saveProgress } from "../api";
+import { apiGet, CourseDetail, fmtDuration, listNotes, NoteRow, saveProgress } from "../api";
 import Materials from "../components/Materials";
 import EditCourse from "../components/EditCourse";
+import NotesPanel from "../components/NotesPanel";
 import { IconCheck, IconPencil, IconPlay, IconUser } from "../components/Icons";
 
 export default function Course() {
@@ -11,12 +12,20 @@ export default function Course() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [thumbVer, setThumbVer] = useState(0); // muda após editar pra recarregar a imagem
+  const [notes, setNotes] = useState<NoteRow[]>([]);
 
   const load = useCallback(() => {
     apiGet<CourseDetail>(`/api/courses/${id}`).then(setCourse).catch((e) => setError(String(e)));
   }, [id]);
 
   useEffect(load, [load]);
+
+  const refreshNotes = useCallback(() => {
+    if (!id) return;
+    listNotes(id).then(setNotes).catch(() => {});
+  }, [id]);
+
+  useEffect(refreshNotes, [refreshNotes]);
 
   if (error) return <div className="page center-msg">Erro ao carregar: {error}</div>;
   if (!course) return <div className="page center-msg">Carregando...</div>;
@@ -114,6 +123,14 @@ export default function Course() {
           </ol>
         </details>
       ))}
+
+      <details className="section" open={notes.length > 0}>
+        <summary>
+          <span className="section-title">Anotações</span>
+          <span className="section-meta">{notes.length}</span>
+        </summary>
+        <NotesPanel courseId={course.id} notes={notes} onRefresh={refreshNotes} />
+      </details>
 
       <Materials materials={course.materials} title="Materiais" />
 

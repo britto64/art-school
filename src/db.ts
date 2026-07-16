@@ -100,6 +100,21 @@ CREATE TABLE IF NOT EXISTS progress (
   updated_at   TEXT NOT NULL
 );
 
+-- Anotações do usuário: como o progress, NUNCA são apagadas no rescan.
+-- lesson_id/time_sec NULL = nota geral do curso; drawing = PNG achatado desenhado por cima do texto.
+CREATE TABLE IF NOT EXISTS notes (
+  id           TEXT PRIMARY KEY,
+  course_id    TEXT NOT NULL,
+  lesson_id    TEXT,
+  time_sec     REAL,
+  text         TEXT NOT NULL DEFAULT '',
+  drawing      BLOB,
+  drawing_mime TEXT,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_course ON notes(course_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id, section_order, sort_order);
 CREATE INDEX IF NOT EXISTS idx_materials_course ON materials(course_id);
 CREATE INDEX IF NOT EXISTS idx_subtitles_lesson ON subtitles(lesson_id);

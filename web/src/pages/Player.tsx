@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiGet, CourseDetail, fmtClock, fmtDuration, PlayerData, saveProgress, TrickplayMeta } from "../api";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  apiGet,
+  CourseDetail,
+  fmtClock,
+  fmtDuration,
+  listNotes,
+  NoteRow,
+  PlayerData,
+  saveProgress,
+  TrickplayMeta
+} from "../api";
 import Materials from "../components/Materials";
+import NotesPanel from "../components/NotesPanel";
 import {
   IconCC,
   IconCheck,
@@ -9,6 +20,7 @@ import {
   IconChevronRight,
   IconForward10,
   IconFullscreen,
+  IconNote,
   IconPause,
   IconPlay,
   IconPlayOutline,
@@ -18,7 +30,8 @@ import {
   IconSkipPrev,
   IconTypography,
   IconVolume,
-  IconVolumeMute
+  IconVolumeMute,
+  IconX
 } from "../components/Icons";
 
 const SUB_PREF_KEY = "artschool.sublang";
@@ -58,6 +71,7 @@ const sanitizeCue = (t: string) => t.replace(/<(?!\/?(i|b|u)\b)[^>]*>/gi, "");
 export default function Player() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const seekWrapRef = useRef<HTMLDivElement>(null);
@@ -89,6 +103,12 @@ export default function Player() {
   // trickplay: preview de frames ao passar o mouse na timeline
   const [tp, setTp] = useState<TrickplayMeta | null>(null);
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
+  // anotações
+  const [notes, setNotes] = useState<NoteRow[]>([]);
+  const [sidebarTab, setSidebarTab] = useState<"lessons" | "notes">("lessons");
+  const [notesDrawer, setNotesDrawer] = useState(false);
+  const [openNoteId, setOpenNoteId] = useState<string | null>(null); // nota aberta via marcador da timeline
+  const [markerHover, setMarkerHover] = useState<string | null>(null);
 
   const hideTimer = useRef<ReturnType<typeof setTimeout>>();
   const pendingResume = useRef(0); // seek pendente do direct play (aplicado no loadedmetadata)
@@ -99,6 +119,8 @@ export default function Player() {
   const compatRef = useRef(false);
   const menuRef = useRef<MenuId>(null);
   menuRef.current = menu;
+  const notesDrawerRef = useRef(false);
+  notesDrawerRef.current = notesDrawer;
 
   const updateSubStyle = (patch: Partial<SubStyle>) =>
     setSubStyle((s) => {
@@ -123,8 +145,15 @@ export default function Player() {
     apiGet<PlayerData>(`/api/lessons/${id}`)
       .then((d) => {
         setData(d);
+        // deep-link ?t= (ex.: "ir para o momento" de uma anotação) ganha da retomada
+        const tParam = Number(searchParams.get("t"));
         // retoma de onde parou (se não estiver praticamente no fim)
-        const resume = d.position > 10 && (!d.duration || d.position < d.duration - 15) ? d.position : 0;
+        const resume =
+          isFinite(tParam) && tParam > 0
+            ? tParam
+            : d.position > 10 && (!d.duration || d.position < d.duration - 15)
+              ? d.position
+              : 0;
         lastPos.current = resume;
         const m: StreamMode = compatRef.current ? "transcode" : d.directPlay ? "direct" : "remux";
         setMode(m);
@@ -157,6 +186,17 @@ export default function Player() {
     if (!data?.course.id) return;
     apiGet<CourseDetail>(`/api/courses/${data.course.id}`).then(setCourse).catch(() => {});
   }, [data?.course.id, id]);
+
+  // ---- anotações do curso ----
+  const refreshNotes = useCallback(() => {
+    if (!data?.course.id) return;
+    listNotes(data.course.id).then(setNotes).catch(() => {});
+  }, [data?.course.id]);
+
+  useEffect(() => {
+    setNotes([]);
+    refreshNotes();
+  }, [refreshNotes]);
 
   const effTime = mode === "direct" ? curTime : offset + curTime;
   // no remux o <video> só conhece o trecho atual; o total vem do ffprobe (ou offset + trecho)
@@ -283,12 +323,12 @@ export default function Player() {
     }
   };
 
-  // ---- controles somem após inatividade (não enquanto um menu estiver aberto) ----
+  // ---- controles somem após inatividade (não com menu ou gaveta de notas abertos) ----
   const poke = () => {
     setShowControls(true);
     clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => {
-      if (!menuRef.current) setShowControls(false);
+      if (!menuRef.current && !notesDrawerRef.current) setShowControls(false);
     }, 3000);
   };
 
@@ -358,7 +398,13 @@ export default function Player() {
   // ---- teclado ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLSelectElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      )
+        return;
       if (e.code === "Space" || e.key === "k") {
         e.preventDefault();
         togglePlay();
@@ -372,6 +418,10 @@ export default function Player() {
         setVolume((v) => Math.max(0, +(v - 0.1).toFixed(2)));
       } else if (e.key === "m") toggleMute();
       else if (e.key === "f") toggleFullscreen();
+      else if (e.key === "n") {
+        setNotesDrawer((v) => !v);
+        setShowControls(true);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -569,6 +619,38 @@ export default function Player() {
                   <div className="seekbar-fill" style={{ width: `${playedPct}%` }} />
                   <div className="seekbar-thumb" style={{ left: `${playedPct}%` }} />
                 </div>
+                {duration > 0 &&
+                  notes
+                    .filter((n) => n.lessonId === data.id && n.timeSec != null)
+                    .map((n) => (
+                      <div
+                        key={n.id}
+                        className="note-marker"
+                        style={{ left: `${(n.timeSec! / duration) * 100}%` }}
+                        // sem isso o pointer capture da seekbar engole o clique como drag-seek
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          seek(n.timeSec!);
+                          setOpenNoteId(n.id);
+                          setNotesDrawer(true);
+                        }}
+                        onPointerEnter={() => setMarkerHover(n.id)}
+                        onPointerLeave={() => setMarkerHover(null)}
+                      >
+                        <IconNote size={11} />
+                        {markerHover === n.id && (
+                          <div className="note-marker-pop">
+                            <span className="note-marker-time">{fmtClock(n.timeSec!)}</span>
+                            <span className="note-marker-text">
+                              {n.text.trim()
+                                ? n.text.slice(0, 90) + (n.text.length > 90 ? "…" : "")
+                                : "(desenho)"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                 {hover && (
                   <div className="seek-preview" style={{ left: hover.x }}>
                     {tp &&
@@ -773,12 +855,51 @@ export default function Player() {
                       </div>
                     )}
                   </div>
+                  <button
+                    className={notesDrawer ? "active" : undefined}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNotesDrawer((v) => !v);
+                    }}
+                    title="Anotações (n)"
+                  >
+                    <IconNote size={19} />
+                  </button>
                   <button onClick={toggleFullscreen} title="Tela cheia (f)">
                     <IconFullscreen size={19} />
                   </button>
                 </div>
               </div>
             </div>
+
+            {/* gaveta de anotações: dentro do wrapper para funcionar em fullscreen */}
+            {notesDrawer && (
+              <div
+                className="notes-drawer"
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <div className="notes-drawer-head">
+                  <span>Anotações</span>
+                  <button className="note-tool" onClick={() => setNotesDrawer(false)} title="Fechar">
+                    <IconX size={15} />
+                  </button>
+                </div>
+                <NotesPanel
+                  compact
+                  courseId={data.course.id}
+                  notes={notes}
+                  onRefresh={refreshNotes}
+                  currentLessonId={data.id}
+                  getCurrentTime={() => lastPos.current}
+                  onSeek={seek}
+                  onOpenEditor={() => videoRef.current?.pause()}
+                  openNoteId={openNoteId}
+                  onOpenNoteHandled={() => setOpenNoteId(null)}
+                />
+              </div>
+            )}
           </div>
 
           {/* ---- materiais embaixo do player ---- */}
@@ -791,7 +912,35 @@ export default function Player() {
             <div className="sidebar-course">{data.course.title}</div>
             {totalLessons > 0 && <div className="sidebar-count">{totalLessons} aulas</div>}
           </div>
-          <div className="sidebar-list">
+          <div className="sidebar-tabs">
+            <button
+              className={sidebarTab === "lessons" ? "sidebar-tab active" : "sidebar-tab"}
+              onClick={() => setSidebarTab("lessons")}
+            >
+              Aulas
+            </button>
+            <button
+              className={sidebarTab === "notes" ? "sidebar-tab active" : "sidebar-tab"}
+              onClick={() => setSidebarTab("notes")}
+            >
+              Notas{notes.length > 0 ? ` (${notes.length})` : ""}
+            </button>
+          </div>
+          {sidebarTab === "notes" && (
+            <div className="sidebar-notes">
+              <NotesPanel
+                compact
+                courseId={data.course.id}
+                notes={notes}
+                onRefresh={refreshNotes}
+                currentLessonId={data.id}
+                getCurrentTime={() => lastPos.current}
+                onSeek={seek}
+                onOpenEditor={() => videoRef.current?.pause()}
+              />
+            </div>
+          )}
+          <div className="sidebar-list" style={sidebarTab === "notes" ? { display: "none" } : undefined}>
             {course?.sections.map((section, i) => {
               const hasSections = course.sections.length > 1 || section.title !== null;
               const containsCurrent = section.lessons.some((l) => l.id === data.id);

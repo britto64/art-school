@@ -140,6 +140,64 @@ export function saveProgress(lessonId: string, position: number, completed?: boo
   });
 }
 
+// ---------- Anotações ----------
+
+export interface NoteRow {
+  id: string;
+  lessonId: string | null; // null = nota geral do curso
+  timeSec: number | null;
+  text: string;
+  hasDrawing: boolean;
+  lessonTitle: string | null; // null em nota geral OU aula removida do disco
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listNotes(courseId: string): Promise<NoteRow[]> {
+  return apiGet<NoteRow[]>(`/api/courses/${courseId}/notes`);
+}
+
+export async function createNote(
+  courseId: string,
+  body: { lessonId?: string; timeSec?: number; text: string }
+): Promise<{ ok: boolean; id: string }> {
+  const res = await fetch(`/api/courses/${courseId}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+export function updateNote(noteId: string, text: string): Promise<Response> {
+  return fetch(`/api/notes/${noteId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+}
+
+export function deleteNote(noteId: string): Promise<Response> {
+  return fetch(`/api/notes/${noteId}`, { method: "DELETE" });
+}
+
+export function uploadNoteDrawing(noteId: string, blob: Blob): Promise<Response> {
+  return fetch(`/api/notes/${noteId}/drawing`, {
+    method: "PUT",
+    headers: { "Content-Type": blob.type || "image/png" },
+    body: blob
+  });
+}
+
+export function deleteNoteDrawing(noteId: string): Promise<Response> {
+  return fetch(`/api/notes/${noteId}/drawing`, { method: "DELETE" });
+}
+
+export function noteDrawingUrl(noteId: string, updatedAt: string): string {
+  return `/api/notes/${noteId}/drawing?v=${encodeURIComponent(updatedAt)}`;
+}
+
 export function fmtDuration(sec: number | null | undefined): string {
   if (!sec || !isFinite(sec)) return "";
   const s = Math.round(sec);

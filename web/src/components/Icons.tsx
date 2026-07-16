@@ -191,6 +191,31 @@ export const IconPencil = (p: IconProps) => (
   </Svg>
 );
 
+export const IconNote = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 3.5h14v11l-6 6H5V3.5Z" />
+    <path d="M13 20.5v-6h6" />
+    <path d="M8.5 9h7M8.5 12.5H12" />
+  </Svg>
+);
+
+export const IconEraser = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m5 15 8.5-8.5a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L13 19H8l-3-3a1.4 1.4 0 0 1 0-1Z" />
+    <path d="m10 10 6 6" />
+    <path d="M13 19h7" />
+  </Svg>
+);
+
+export const IconTrash = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 6.5h16" />
+    <path d="M9 6.5V4.8A1.3 1.3 0 0 1 10.3 3.5h3.4A1.3 1.3 0 0 1 15 4.8v1.7" />
+    <path d="M6.5 6.5 7.5 20a1.5 1.5 0 0 0 1.5 1.5h6A1.5 1.5 0 0 0 16.5 20l1-13.5" />
+    <path d="M10 10.5v7M14 10.5v7" />
+  </Svg>
+);
+
 export const IconX = (p: IconProps) => (
   <Svg {...p}>
     <path d="M6 6l12 12M18 6 6 18" strokeWidth={3} />

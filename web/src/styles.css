@@ -1919,6 +1919,457 @@ button {
   padding-top: 8px;
 }
 
+/* ---------- anotações ---------- */
+
+/* papel branco da nota */
+.note-paper {
+  background: #fbfaf4;
+  color: #1a1a1a;
+  border: 2px solid var(--hard);
+  border-radius: 10px;
+  box-shadow: 6px 6px 0 var(--hard);
+  overflow: hidden;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.note-paper-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #efe9d8;
+  border-bottom: 2px solid var(--hard);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.note-paper-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-paper-time {
+  background: var(--accent-strong);
+  color: #fff;
+  border: 1.5px solid var(--hard);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.note-paper-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* corpo fixo: o PNG do desenho precisa se alinhar com o texto em qualquer contexto */
+.note-paper-body {
+  position: relative;
+  width: 400px;
+  height: 300px;
+  max-width: 100%;
+  /* linhas de caderno alinhadas ao line-height de 28px do texto */
+  background-image: repeating-linear-gradient(transparent, transparent 27px, #ddd8c6 27px, #ddd8c6 28px);
+  background-origin: content-box;
+}
+
+.note-paper-text {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  padding: 4px 12px;
+  color: #1a1a1a;
+  font-family: inherit;
+  font-size: 14.5px;
+  line-height: 28px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-paper-text::placeholder {
+  color: #9a947f;
+}
+
+.note-paper-drawing,
+.note-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.note-paper-drawing {
+  pointer-events: none;
+  user-select: none;
+}
+
+.note-canvas {
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.note-paper-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #efe9d8;
+  border-top: 2px solid var(--hard);
+}
+
+.note-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.note-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid var(--hard);
+  border-radius: 7px;
+  background: #fbfaf4;
+  color: #1a1a1a;
+  transition: 0.12s;
+}
+
+.note-tool:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 2px 2px 0 var(--hard);
+}
+
+.note-tool.active {
+  background: var(--accent);
+  color: var(--hard);
+}
+
+/* nos headers escuros (gaveta do player) o note-tool herda o tema dark */
+.notes-drawer-head .note-tool {
+  background: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.note-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--hard);
+  padding: 0;
+  transition: 0.12s;
+}
+
+.note-swatch:hover {
+  transform: scale(1.12);
+}
+
+.note-swatch.active {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 1px;
+}
+
+.note-save {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+/* painel de notas (lista) */
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notes-add {
+  font-size: 12.5px;
+  padding: 7px 12px;
+}
+
+.notes-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 0;
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.notes-group-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+
+.notes-group-title.current {
+  color: var(--accent);
+}
+
+.note-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  text-align: left;
+  background: #fbfaf4;
+  color: #1a1a1a;
+  border: 2px solid var(--hard);
+  border-radius: 9px;
+  box-shadow: 3px 3px 0 var(--hard);
+  padding: 8px 10px;
+  transition: 0.12s;
+  cursor: pointer;
+}
+
+.note-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--hard);
+}
+
+.note-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-card-top:empty {
+  display: none;
+}
+
+.note-card-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-strong);
+  color: #fff;
+  border: 1.5px solid var(--hard);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.note-card-time:hover {
+  background: var(--accent);
+  color: var(--hard);
+}
+
+.note-card-badge {
+  display: inline-flex;
+  align-items: center;
+  color: #6b654e;
+}
+
+.note-card-text {
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* grade na página do curso */
+.notes-panel:not(.compact) .notes-list {
+  gap: 16px;
+}
+
+.notes-panel:not(.compact) .notes-group {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.notes-panel:not(.compact) .notes-group-title {
+  width: 100%;
+}
+
+.notes-panel:not(.compact) .note-card {
+  width: 230px;
+}
+
+.note-modal {
+  max-width: calc(100vw - 40px);
+}
+
+/* gaveta de notas no player (funciona em fullscreen: fica dentro do .video-wrap) */
+.notes-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(430px, 92%);
+  background: var(--bg);
+  border-left: 2px solid var(--hard);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 0 14px 14px;
+  animation: drawer-in 0.16s ease-out;
+  cursor: default;
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notes-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 800;
+  font-size: 14px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+
+/* marcador de nota na timeline */
+.note-marker {
+  position: absolute;
+  top: -8px;
+  transform: translateX(-50%);
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--hard);
+  border: 2px solid var(--hard);
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 7;
+  transition: 0.12s;
+}
+
+.note-marker:hover {
+  transform: translateX(-50%) scale(1.15);
+}
+
+.note-marker-pop {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  max-width: 250px;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 2px solid var(--hard);
+  border-radius: 9px;
+  box-shadow: 4px 4px 0 var(--hard);
+  padding: 8px 10px;
+  pointer-events: none;
+  z-index: 8;
+}
+
+.note-marker-time {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.note-marker-text {
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* abas da sidebar do player */
+.sidebar-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: 800;
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 2px solid var(--border);
+  border-radius: 9px;
+  transition: 0.12s;
+}
+
+.sidebar-tab:hover {
+  color: var(--text);
+}
+
+.sidebar-tab.active {
+  background: var(--accent);
+  color: var(--hard);
+  border-color: var(--hard);
+  box-shadow: 2px 2px 0 var(--hard);
+}
+
+.sidebar-notes {
+  padding: 0 16px 16px;
+  overflow-y: auto;
+}
+
 /* ---------- responsivo ---------- */
 @media (max-width: 640px) {
   .page {

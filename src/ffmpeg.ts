@@ -290,16 +290,86 @@ export async function generateMissingTrickplay(): Promise<void> {
   }
 }
 
-/** Stream remux (mkv -> mp4 fragmentado, sem recodificar) para o browser */
-export function remuxStream(absPath: string, startSec: number, transcode: boolean) {
+// ---------- streaming (remux / transcode) ----------
+
+export interface MediaCodecs {
+  video: string | null;
+  audio: string | null;
+}
+
+// codecs de vídeo que o browser toca dentro de mp4 sem recodificar
+const COPY_VIDEO = new Set(["h264", "hevc", "vp9", "av1"]);
+
+const codecsCache = new Map<string, MediaCodecs>();
+
+/** Codecs de vídeo/áudio do arquivo via ffprobe (com cache em memória) */
+export function probeCodecs(absPath: string): Promise<MediaCodecs> {
+  const cached = codecsCache.get(absPath);
+  if (cached) return Promise.resolve(cached);
+  return new Promise((resolve) => {
+    execFile(
+      "ffprobe",
+      ["-v", "error", "-show_entries", "stream=codec_type,codec_name", "-of", "json", absPath],
+      { timeout: 30_000 },
+      (err, stdout) => {
+        if (err) return resolve({ video: null, audio: null });
+        try {
+          const streams = (JSON.parse(stdout).streams ?? []) as { codec_type?: string; codec_name?: string }[];
+          const info: MediaCodecs = {
+            video: streams.find((s) => s.codec_type === "video")?.codec_name ?? null,
+            audio: streams.find((s) => s.codec_type === "audio")?.codec_name ?? null
+          };
+          codecsCache.set(absPath, info);
+          resolve(info);
+        } catch {
+          resolve({ video: null, audio: null });
+        }
+      }
+    );
+  });
+}
+
+/**
+ * Stream mp4 fragmentado para o browser.
+ * Copia o vídeo quando o codec é compatível (h264/hevc/vp9/av1); senão recodifica
+ * para h264. Áudio aac é copiado; o resto vira aac. Legendas embutidas, attachments
+ * e trilhas extras são descartados — eles quebram o mux mp4 (era o que travava mkv/mov).
+ */
+export function remuxStream(absPath: string, startSec: number, transcode: boolean, codecs: MediaCodecs) {
   const args = ["-hide_banner", "-loglevel", "error"];
   if (startSec > 0) args.push("-ss", String(startSec));
   args.push("-i", absPath);
-  if (transcode) {
-    args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-b:a", "160k");
+  // só a primeira trilha de vídeo/áudio; sem legendas/attachments/dados
+  args.push("-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "-1");
+
+  const copyVideo = !transcode && codecs.video !== null && COPY_VIDEO.has(codecs.video);
+  if (copyVideo) {
+    args.push("-c:v", "copy");
+    if (codecs.video === "hevc") args.push("-tag:v", "hvc1"); // sem a tag o browser não reconhece hevc
   } else {
-    args.push("-c:v", "copy", "-c:a", "aac", "-b:a", "192k"); // áudio p/ aac (compatibilidade), vídeo copiado
+    args.push(
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+      "-pix_fmt", "yuv420p", // fontes 10-bit/4:2:2 (comum em .mov/ProRes) não tocam no browser sem isso
+      "-g", "60"
+    );
   }
-  args.push("-movflags", "frag_keyframe+empty_moov+default_base_moof", "-f", "mp4", "pipe:1");
-  return spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "ignore"] });
+  if (!transcode && codecs.audio === "aac") args.push("-c:a", "copy");
+  else args.push("-c:a", "aac", "-b:a", "192k", "-ac", "2");
+
+  args.push(
+    "-max_muxing_queue_size", "1024",
+    "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+    "-f", "mp4", "pipe:1"
+  );
+  const ff = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
+  // loga o motivo quando o ffmpeg morre sozinho (kill por desconexão do cliente sai com code null)
+  let stderr = "";
+  ff.stderr.on("data", (d: Buffer) => {
+    if (stderr.length < 4000) stderr += d.toString();
+  });
+  ff.on("close", (code) => {
+    if (code && code !== 0)
+      console.error(`[stream] ffmpeg falhou (${path.basename(absPath)}):`, stderr.trim().slice(0, 500));
+  });
+  return ff;
 }

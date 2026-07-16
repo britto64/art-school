@@ -210,6 +210,34 @@ export const IconUser = (p: IconProps) => (
   </Svg>
 );
 
+export const IconVolume = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 9.5v5h3.2L11.5 19V5L6.7 9.5H3.5Z" fill="currentColor" strokeWidth={1.8} />
+    <path d="M15 9.2a4.2 4.2 0 0 1 0 5.6M18 6.4a8.2 8.2 0 0 1 0 11.2" />
+  </Svg>
+);
+
+export const IconVolumeMute = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 9.5v5h3.2L11.5 19V5L6.7 9.5H3.5Z" fill="currentColor" strokeWidth={1.8} />
+    <path d="m15.5 9.5 5 5M20.5 9.5l-5 5" />
+  </Svg>
+);
+
+export const IconSettings = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="3.1" />
+    <path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3M5.3 5.3l2.2 2.2M16.5 16.5l2.2 2.2M18.7 5.3l-2.2 2.2M7.5 16.5l-2.2 2.2" />
+  </Svg>
+);
+
+export const IconCC = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+    <path d="M11 10.4a2.4 2.4 0 1 0 0 3.2M17.5 10.4a2.4 2.4 0 1 0 0 3.2" strokeWidth={2.2} />
+  </Svg>
+);
+
 export const IconTypography = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3" y="4.5" width="18" height="15" rx="2.5" />

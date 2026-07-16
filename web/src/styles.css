@@ -956,11 +956,60 @@ button {
   pointer-events: none;
 }
 
-.seekbar {
-  width: 100%;
-  accent-color: var(--accent-strong);
+/* ---- timeline customizada (fill + buffer + thumb) ---- */
+.seekbar-wrap {
+  position: relative;
+  padding: 10px 0 6px;
   cursor: pointer;
+  touch-action: none;
+}
+
+.seekbar-track {
+  position: relative;
   height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: height 0.12s;
+}
+
+.seekbar-wrap:hover .seekbar-track,
+.seekbar-wrap.dragging .seekbar-track {
+  height: 8px;
+}
+
+.seekbar-buffer,
+.seekbar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 999px;
+}
+
+.seekbar-buffer {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.seekbar-fill {
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+}
+
+.seekbar-thumb {
+  position: absolute;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent-strong);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.12s;
+  pointer-events: none;
+}
+
+.seekbar-wrap:hover .seekbar-thumb,
+.seekbar-wrap.dragging .seekbar-thumb {
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .controls-row {
@@ -1015,29 +1064,274 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-.controls select {
-  background: rgba(20, 22, 30, 0.92);
-  color: var(--text);
-  border: 2px solid rgba(255, 255, 255, 0.75);
-  border-radius: 8px;
-  padding: 4px 6px;
-  font-size: 12.5px;
-  font-weight: 700;
+.controls button.active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.controls button.cc-on {
+  color: var(--accent);
+  box-shadow: inset 0 -2.5px 0 var(--accent);
+  border-radius: 8px 8px 4px 4px;
+}
+
+/* ---- volume (mudo + slider que expande) ---- */
+.ctrl-volume {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .volume {
-  width: 80px;
-  accent-color: var(--accent);
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0;
+  opacity: 0;
+  height: 4.5px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  transition: width 0.16s, opacity 0.16s;
 }
 
-.autonext {
+.ctrl-volume:hover .volume,
+.volume:focus-visible,
+.volume:active {
+  width: 76px;
+  opacity: 1;
+}
+
+.volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.volume::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+}
+
+@media (pointer: coarse) {
+  .volume {
+    width: 70px;
+    opacity: 1;
+  }
+}
+
+/* ---- menus dropup (legendas / configurações) ---- */
+.menu-anchor {
+  position: relative;
+  display: flex;
+}
+
+.menu {
+  position: absolute;
+  bottom: 50px;
+  right: 0;
+  width: 252px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: rgba(16, 18, 26, 0.97);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--hard);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: default;
+  z-index: 6;
+}
+
+.menu-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+  padding: 4px 8px 6px;
+}
+
+.menu .menu-item {
   display: flex;
   align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 9px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  color: var(--text);
+  justify-content: flex-start;
+}
+
+.menu .menu-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.menu .mi-check {
+  flex: 0 0 16px;
+  display: flex;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.menu .mi-arrow {
+  margin-left: auto;
+  color: var(--text-dim);
+  display: flex;
+}
+
+.menu .menu-back {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   gap: 5px;
-  font-size: 12.5px;
-  color: #ddd;
-  user-select: none;
-  cursor: pointer;
+}
+
+.menu-item-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.menu-item-text small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.menu-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.14);
+  margin: 6px 4px;
+  flex-shrink: 0;
+}
+
+.menu .rate-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 6px 6px;
+}
+
+.menu .rate-pill {
+  background: none;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 3.5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: 0.12s;
+}
+
+.menu .rate-pill:hover {
+  border-color: #fff;
+}
+
+.menu .rate-pill.active {
+  background: var(--accent-strong);
+  border-color: #fff;
+  box-shadow: 2px 2px 0 var(--hard);
+}
+
+/* ---- switch (toggles dos menus) ---- */
+.switch {
+  flex-shrink: 0;
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  position: relative;
+  transition: 0.15s;
+}
+
+.switch.on {
+  background: var(--accent-strong);
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2.5px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: 0.15s;
+}
+
+.switch.on .switch-knob {
+  left: 17px;
+}
+
+/* ---- spinner de buffering ---- */
+.player-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.player-spinner::after {
+  content: "";
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--accent);
+  animation: player-spin 0.8s linear infinite;
+}
+
+@keyframes player-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- erro de reprodução ---- */
+.player-error {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 7, 12, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 4;
+  text-align: center;
+  padding: 24px;
+}
+
+.player-error-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+.player-error .btn-primary {
+  align-self: center;
 }
 
 /* ---------- thumbs de aula ---------- */
@@ -1082,10 +1376,6 @@ button {
 }
 
 /* ---------- trickplay (preview da timeline) ---------- */
-.seekbar-wrap {
-  position: relative;
-}
-
 .seek-preview {
   position: absolute;
   bottom: 24px;
@@ -1568,36 +1858,10 @@ button {
   z-index: 2;
 }
 
-.sub-settings {
-  position: relative;
-  display: flex;
-}
-
-.sub-settings > button.active {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.sub-panel {
-  position: absolute;
-  bottom: 46px;
-  right: 0;
-  width: 250px;
-  background: var(--bg-card);
-  border: 2px solid var(--text);
-  border-radius: 12px;
-  box-shadow: 4px 4px 0 var(--hard);
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  cursor: default;
-}
-
-.sub-panel-title {
-  font-size: 13px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.menu.sub-panel {
+  width: 268px;
+  gap: 9px;
+  padding: 10px 12px 12px;
 }
 
 .sub-panel-row {

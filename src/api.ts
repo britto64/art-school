@@ -10,6 +10,7 @@ import {
   generateMissingTrickplay,
   generateThumb,
   getLessonThumb,
+  probeCodecs,
   remuxStream
 } from "./ffmpeg.js";
 
@@ -285,7 +286,7 @@ api.get("/lessons/:id", (req, res) => {
 });
 
 // ---------- Streaming ----------
-api.get("/stream/:id", (req, res) => {
+api.get("/stream/:id", async (req, res) => {
   const lesson = db.prepare("SELECT rel_path FROM lessons WHERE id = ?").get(req.params.id) as
     | { rel_path: string }
     | undefined;
@@ -323,8 +324,9 @@ api.get("/stream/:id", (req, res) => {
 
   // Remux (mkv etc.): mp4 fragmentado via ffmpeg; seek = novo request com ?t=
   const startSec = Math.max(0, Number(req.query.t) || 0);
+  const codecs = await probeCodecs(file);
   res.setHeader("Content-Type", "video/mp4");
-  const ff = remuxStream(file, startSec, transcode);
+  const ff = remuxStream(file, startSec, transcode, codecs);
   ff.stdout.pipe(res);
   const kill = () => {
     try {
@@ -370,7 +372,7 @@ api.get("/materials/:id", (req, res) => {
 });
 
 // visualizar material no navegador (imagem/pdf/txt direto; vídeo via remux se preciso)
-api.get("/materials/:id/view", (req, res) => {
+api.get("/materials/:id/view", async (req, res) => {
   const mat = db.prepare("SELECT rel_path FROM materials WHERE id = ?").get(req.params.id) as
     | { rel_path: string }
     | undefined;
@@ -383,8 +385,9 @@ api.get("/materials/:id/view", (req, res) => {
 
   if (kind === "video" && !DIRECT_PLAY.has(ext)) {
     // .mov/.mkv/.avi: remux para mp4 fragmentado, igual às aulas
+    const codecs = await probeCodecs(file);
     res.setHeader("Content-Type", "video/mp4");
-    const ff = remuxStream(file, 0, false);
+    const ff = remuxStream(file, 0, false, codecs);
     ff.stdout.pipe(res);
     const kill = () => {
       try {

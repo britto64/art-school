@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiGet, CourseDetail, fmtClock, fmtDuration, PlayerData, saveProgress, TrickplayMeta } from "../api";
 import Materials from "../components/Materials";
 import {
+  IconCC,
   IconCheck,
   IconChevronLeft,
   IconChevronRight,
@@ -12,15 +13,24 @@ import {
   IconPlay,
   IconPlayOutline,
   IconRewind10,
+  IconSettings,
   IconSkipNext,
   IconSkipPrev,
-  IconTypography
+  IconTypography,
+  IconVolume,
+  IconVolumeMute
 } from "../components/Icons";
 
 const SUB_PREF_KEY = "artschool.sublang";
 const AUTONEXT_KEY = "artschool.autonext";
 const RATE_KEY = "artschool.rate";
 const SUBSTYLE_KEY = "artschool.substyle";
+
+const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+// como o vídeo chega ao browser; em erro de reprodução escala direct -> remux -> transcode
+type StreamMode = "direct" | "remux" | "transcode";
+type MenuId = "cc" | "settings" | "substyle" | null;
 
 // estilo global das legendas (vale para todos os cursos)
 interface SubStyle {
@@ -32,7 +42,7 @@ interface SubStyle {
 
 const DEFAULT_SUBSTYLE: SubStyle = { size: 22, color: "#ffffff", bg: 0.75, outline: false };
 
-const SUB_COLORS = ["#ffffff", "#fde047", "#4ade80", "#67e8f9", "#f9a8d4"];
+const SUB_COLORS = ["#ffffff", "#fde047", "#4ade80", "#67e8f9", "#f9a8d4", "#fb923c"];
 
 function loadSubStyle(): SubStyle {
   try {
@@ -50,28 +60,45 @@ export default function Player() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const seekWrapRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<PlayerData | null>(null);
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [mode, setMode] = useState<StreamMode>("direct");
   // offset do remux: o <video> começa em 0, mas o tempo real é offset + currentTime
   const [offset, setOffset] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0); // força remontar o <video> quando o src não muda
+  const [fatal, setFatal] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [curTime, setCurTime] = useState(0);
   const [videoDur, setVideoDur] = useState(0);
+  const [buffered, setBuffered] = useState(0);
   const [volume, setVolume] = useState(() => Number(localStorage.getItem("artschool.volume") ?? 1));
   const [rate, setRate] = useState(() => Number(localStorage.getItem(RATE_KEY) ?? 1));
   const [autoNext, setAutoNext] = useState(() => localStorage.getItem(AUTONEXT_KEY) !== "0");
+  const [compat, setCompat] = useState(false); // modo compatibilidade: força recodificação
   const [subLang, setSubLang] = useState<string | null>(null);
   const [subStyle, setSubStyle] = useState<SubStyle>(loadSubStyle);
-  const [subPanel, setSubPanel] = useState(false);
   const [cueLines, setCueLines] = useState<string[]>([]);
+  const [menu, setMenu] = useState<MenuId>(null);
   const [showControls, setShowControls] = useState(true);
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [drag, setDrag] = useState<number | null>(null); // arrastando a timeline
   // trickplay: preview de frames ao passar o mouse na timeline
   const [tp, setTp] = useState<TrickplayMeta | null>(null);
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
-  const seekWrapRef = useRef<HTMLDivElement>(null);
+
+  const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const pendingResume = useRef(0); // seek pendente do direct play (aplicado no loadedmetadata)
+  // última posição real conhecida: no unmount o <video> já foi destruído, então o save
+  // final não pode ler videoRef (era isso que zerava o progresso ao navegar pela SPA)
+  const lastPos = useRef(0);
+  const lastVolume = useRef(1);
+  const compatRef = useRef(false);
+  const menuRef = useRef<MenuId>(null);
+  menuRef.current = menu;
 
   const updateSubStyle = (patch: Partial<SubStyle>) =>
     setSubStyle((s) => {
@@ -85,16 +112,24 @@ export default function Player() {
     setData(null);
     setOffset(0);
     setCurTime(0);
+    setVideoDur(0);
+    setBuffered(0);
+    setFatal(null);
+    setWaiting(false);
+    setDrag(null);
+    setMenu(null);
+    setReloadKey(0);
+    pendingResume.current = 0;
     apiGet<PlayerData>(`/api/lessons/${id}`)
       .then((d) => {
         setData(d);
         // retoma de onde parou (se não estiver praticamente no fim)
         const resume = d.position > 10 && (!d.duration || d.position < d.duration - 15) ? d.position : 0;
-        if (d.directPlay) {
-          if (videoRef.current) videoRef.current.dataset.resume = String(resume);
-        } else {
-          setOffset(resume);
-        }
+        lastPos.current = resume;
+        const m: StreamMode = compatRef.current ? "transcode" : d.directPlay ? "direct" : "remux";
+        setMode(m);
+        if (m === "direct") pendingResume.current = resume;
+        else setOffset(Math.floor(resume));
         // legenda preferida
         const pref = localStorage.getItem(SUB_PREF_KEY);
         const langs = d.subtitles.map((s) => s.lang);
@@ -123,23 +158,27 @@ export default function Player() {
     apiGet<CourseDetail>(`/api/courses/${data.course.id}`).then(setCourse).catch(() => {});
   }, [data?.course.id, id]);
 
-  const effTime = data?.directPlay ? curTime : offset + curTime;
-  const duration = data?.duration ?? (videoDur > 0 && isFinite(videoDur) ? videoDur : 0);
+  const effTime = mode === "direct" ? curTime : offset + curTime;
+  // no remux o <video> só conhece o trecho atual; o total vem do ffprobe (ou offset + trecho)
+  const duration =
+    data?.duration ??
+    (videoDur > 0 && isFinite(videoDur) ? (mode === "direct" ? videoDur : offset + videoDur) : 0);
 
   // ---- src do vídeo ----
   const src = useMemo(() => {
     if (!data) return undefined;
-    return data.directPlay ? `/api/stream/${data.id}` : `/api/stream/${data.id}?t=${Math.floor(offset)}`;
-  }, [data, offset]);
+    if (mode === "direct") return `/api/stream/${data.id}`;
+    const base = `/api/stream/${data.id}?t=${Math.floor(offset)}`;
+    return mode === "transcode" ? `${base}&transcode=1` : base;
+  }, [data, mode, offset]);
 
   // ---- progresso ----
   const save = useCallback(
     (completed?: boolean) => {
       if (!data) return;
-      const pos = data.directPlay ? videoRef.current?.currentTime ?? 0 : offset + (videoRef.current?.currentTime ?? 0);
-      void saveProgress(data.id, pos, completed);
+      void saveProgress(data.id, lastPos.current, completed);
     },
-    [data, offset]
+    [data]
   );
 
   useEffect(() => {
@@ -151,13 +190,45 @@ export default function Player() {
 
   useEffect(() => {
     const onUnload = () => save();
+    const onVis = () => {
+      if (document.visibilityState === "hidden") save(); // mobile não dispara beforeunload
+    };
     window.addEventListener("beforeunload", onUnload);
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("beforeunload", onUnload);
-      save(); // salva ao sair da página/trocar de aula
+      document.removeEventListener("visibilitychange", onVis);
+      save(); // salva ao sair da página/trocar de aula (usa lastPos, o <video> já se foi)
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.id]);
+  }, [save]);
+
+  // ---- troca de modo de stream (fallback, compat, seek do remux) ----
+  const switchMode = (m: StreamMode, at: number) => {
+    setFatal(null);
+    setBuffered(0);
+    setWaiting(true);
+    lastPos.current = at;
+    if (m === "direct") {
+      pendingResume.current = at;
+      setOffset(0);
+    } else {
+      setOffset(Math.floor(at));
+    }
+    setCurTime(0);
+    setMode(m);
+    setReloadKey((k) => k + 1);
+  };
+
+  // erro de reprodução: tenta o próximo modo (direct -> remux -> transcode)
+  const onVideoError = () => {
+    const code = videoRef.current?.error?.code ?? 0;
+    if (code === 1 || !data) return; // 1 = abort (troca de src, não é erro real)
+    setWaiting(false);
+    setPlaying(false);
+    if (mode === "direct") switchMode("remux", lastPos.current);
+    else if (mode === "remux") switchMode("transcode", lastPos.current);
+    else setFatal("Não foi possível reproduzir este vídeo, nem recodificando. Verifique o ffmpeg no servidor.");
+  };
 
   // ---- legendas: renderização própria (overlay customizável) ----
   useEffect(() => {
@@ -186,11 +257,11 @@ export default function Player() {
     track.addEventListener("cuechange", onCue);
     onCue();
     return () => track.removeEventListener("cuechange", onCue);
-  }, [subLang, src, data]);
+  }, [subLang, src, data, reloadKey]);
 
-  // fecha o painel de estilo junto com os controles
+  // fecha os menus junto com os controles
   useEffect(() => {
-    if (!showControls) setSubPanel(false);
+    if (!showControls) setMenu(null);
   }, [showControls]);
 
   // ---- volume / velocidade ----
@@ -203,22 +274,33 @@ export default function Player() {
     localStorage.setItem(RATE_KEY, String(rate));
   }, [rate, src]);
 
-  // ---- controles somem após inatividade ----
+  const toggleMute = () => {
+    if (volume > 0) {
+      lastVolume.current = volume;
+      setVolume(0);
+    } else {
+      setVolume(lastVolume.current || 1);
+    }
+  };
+
+  // ---- controles somem após inatividade (não enquanto um menu estiver aberto) ----
   const poke = () => {
     setShowControls(true);
     clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => setShowControls(false), 3000);
+    hideTimer.current = setTimeout(() => {
+      if (!menuRef.current) setShowControls(false);
+    }, 3000);
   };
 
   const seek = (t: number) => {
-    if (!data) return;
+    if (!data || fatal) return;
     const clamped = Math.max(0, duration > 0 ? Math.min(t, duration - 0.5) : t);
-    if (data.directPlay) {
+    lastPos.current = clamped;
+    if (mode === "direct") {
       if (videoRef.current) videoRef.current.currentTime = clamped;
     } else {
       save();
-      setOffset(clamped);
-      setCurTime(0);
+      switchMode(mode, clamped);
     }
   };
 
@@ -248,7 +330,7 @@ export default function Player() {
   const toggleWatched = () => {
     if (!data) return;
     const value = !data.completed;
-    void saveProgress(data.id, effTime, value);
+    void saveProgress(data.id, lastPos.current, value);
     markDoneLocal(value);
   };
 
@@ -259,6 +341,20 @@ export default function Player() {
     if (autoNext && data.next) navigate(`/aula/${data.next.id}`);
   };
 
+  const setCompatMode = (on: boolean) => {
+    setCompat(on);
+    compatRef.current = on;
+    if (!data) return;
+    save();
+    switchMode(on ? "transcode" : data.directPlay ? "direct" : "remux", lastPos.current);
+  };
+
+  const chooseLang = (lang: string | null) => {
+    setSubLang(lang);
+    if (lang) localStorage.setItem(SUB_PREF_KEY, lang);
+    else localStorage.removeItem(SUB_PREF_KEY);
+  };
+
   // ---- teclado ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -266,8 +362,15 @@ export default function Player() {
       if (e.code === "Space" || e.key === "k") {
         e.preventDefault();
         togglePlay();
-      } else if (e.key === "ArrowRight") seek(effTime + 10);
-      else if (e.key === "ArrowLeft") seek(effTime - 10);
+      } else if (e.key === "ArrowRight" || e.key === "l") seek(effTime + 10);
+      else if (e.key === "ArrowLeft" || e.key === "j") seek(effTime - 10);
+      else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setVolume((v) => Math.min(1, +(v + 0.1).toFixed(2)));
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setVolume((v) => Math.max(0, +(v - 0.1).toFixed(2)));
+      } else if (e.key === "m") toggleMute();
       else if (e.key === "f") toggleFullscreen();
     };
     window.addEventListener("keydown", onKey);
@@ -283,6 +386,27 @@ export default function Player() {
   if (!data) return <div className="page center-msg">Carregando...</div>;
 
   const totalLessons = course ? course.sections.reduce((n, s) => n + s.lessons.length, 0) : 0;
+
+  // ---- timeline ----
+  const shownTime = drag ?? effTime;
+  const playedPct = duration > 0 ? Math.min(100, (shownTime / duration) * 100) : 0;
+  const bufferedPct = duration > 0 ? Math.min(100, (buffered / duration) * 100) : 0;
+
+  const timeAt = (clientX: number) => {
+    const rect = seekWrapRef.current?.getBoundingClientRect();
+    if (!rect || duration <= 0) return 0;
+    const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return frac * duration;
+  };
+
+  const updateHover = (clientX: number) => {
+    const rect = seekWrapRef.current?.getBoundingClientRect();
+    if (!rect || duration <= 0) return;
+    const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const half = (tp ? tp.tileW / 2 : 42) + 6;
+    const x = Math.min(Math.max(frac * rect.width, half), Math.max(half, rect.width - half));
+    setHover({ x, time: frac * duration });
+  };
 
   return (
     <div className="player-page">
@@ -332,15 +456,16 @@ export default function Player() {
             onClick={poke}
           >
             <video
-              key={src}
+              key={`${src}#${reloadKey}`}
               ref={videoRef}
               src={src}
-              autoPlay={effTime > 0 || playing}
+              autoPlay={playing || offset > 0 || pendingResume.current > 0 || reloadKey > 0}
               crossOrigin="anonymous"
-              onClick={togglePlay}
+              onClick={() => (menu ? setMenu(null) : togglePlay())}
               onDoubleClick={toggleFullscreen}
               onPlay={() => {
                 setPlaying(true);
+                save(); // garante a linha no progresso logo no primeiro play
                 poke();
               }}
               onPause={() => {
@@ -348,24 +473,53 @@ export default function Player() {
                 save();
                 setShowControls(true);
               }}
-              onTimeUpdate={(e) => setCurTime(e.currentTarget.currentTime)}
+              onTimeUpdate={(e) => {
+                const t = e.currentTarget.currentTime;
+                setCurTime(t);
+                lastPos.current = mode === "direct" ? t : offset + t;
+              }}
+              onLoadStart={() => setWaiting(true)}
+              onCanPlay={() => setWaiting(false)}
+              onPlaying={() => setWaiting(false)}
+              onWaiting={() => setWaiting(true)}
+              onSeeked={() => setWaiting(false)}
+              onProgress={(e) => {
+                const b = e.currentTarget.buffered;
+                if (b.length > 0) setBuffered((mode === "direct" ? 0 : offset) + b.end(b.length - 1));
+              }}
               onLoadedMetadata={(e) => {
                 const v = e.currentTarget;
                 setVideoDur(v.duration);
                 v.volume = volume;
                 v.playbackRate = rate;
-                const resume = Number(v.dataset.resume ?? 0);
-                if (data.directPlay && resume > 0) {
-                  v.currentTime = resume;
-                  delete v.dataset.resume;
+                if (mode === "direct" && pendingResume.current > 0) {
+                  v.currentTime = pendingResume.current;
+                  pendingResume.current = 0;
                 }
               }}
               onEnded={onEnded}
+              onError={onVideoError}
             >
               {data.subtitles.map((s) => (
                 <track key={s.id} kind="subtitles" label={s.lang} src={`/api/subtitles/${s.id}`} />
               ))}
             </video>
+
+            {waiting && !fatal && <div className="player-spinner" />}
+
+            {fatal && (
+              <div className="player-error">
+                <div className="player-error-title">{fatal}</div>
+                <button
+                  className="btn-primary"
+                  onClick={() =>
+                    switchMode(compat ? "transcode" : data.directPlay ? "direct" : "remux", lastPos.current)
+                  }
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
 
             {subLang && cueLines.length > 0 && (
               <div
@@ -392,26 +546,29 @@ export default function Player() {
             <div className={showControls ? "controls" : "controls controls-hidden"}>
               <div
                 ref={seekWrapRef}
-                className="seekbar-wrap"
-                onMouseMove={(e) => {
-                  const rect = seekWrapRef.current?.getBoundingClientRect();
-                  if (!rect || duration <= 0) return;
-                  const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-                  const half = (tp ? tp.tileW / 2 : 42) + 6;
-                  const x = Math.min(Math.max(frac * rect.width, half), Math.max(half, rect.width - half));
-                  setHover({ x, time: frac * duration });
+                className={drag !== null ? "seekbar-wrap dragging" : "seekbar-wrap"}
+                onPointerDown={(e) => {
+                  if (duration <= 0) return;
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  setDrag(timeAt(e.clientX));
                 }}
-                onMouseLeave={() => setHover(null)}
+                onPointerMove={(e) => {
+                  updateHover(e.clientX);
+                  if (drag !== null) setDrag(timeAt(e.clientX));
+                }}
+                onPointerUp={() => {
+                  if (drag !== null) {
+                    seek(drag);
+                    setDrag(null);
+                  }
+                }}
+                onPointerLeave={() => setHover(null)}
               >
-                <input
-                  className="seekbar"
-                  type="range"
-                  min={0}
-                  max={duration || 1}
-                  step={0.1}
-                  value={Math.min(effTime, duration || effTime)}
-                  onChange={(e) => seek(Number(e.target.value))}
-                />
+                <div className="seekbar-track">
+                  <div className="seekbar-buffer" style={{ width: `${bufferedPct}%` }} />
+                  <div className="seekbar-fill" style={{ width: `${playedPct}%` }} />
+                  <div className="seekbar-thumb" style={{ left: `${playedPct}%` }} />
+                </div>
                 {hover && (
                   <div className="seek-preview" style={{ left: hover.x }}>
                     {tp &&
@@ -442,35 +599,80 @@ export default function Player() {
                   <button onClick={() => data.prev && navigate(`/aula/${data.prev.id}`)} disabled={!data.prev} title="Aula anterior">
                     <IconSkipPrev size={19} />
                   </button>
-                  <button className="play-btn" onClick={togglePlay} title={playing ? "Pausar" : "Reproduzir"}>
+                  <button className="play-btn" onClick={togglePlay} title={playing ? "Pausar (espaço)" : "Reproduzir (espaço)"}>
                     {playing ? <IconPause size={24} /> : <IconPlay size={24} />}
                   </button>
                   <button onClick={() => data.next && navigate(`/aula/${data.next.id}`)} disabled={!data.next} title="Próxima aula">
                     <IconSkipNext size={19} />
                   </button>
-                  <button onClick={() => seek(effTime - 10)} title="Voltar 10s">
+                  <button onClick={() => seek(effTime - 10)} title="Voltar 10s (←)">
                     <IconRewind10 size={21} />
                   </button>
-                  <button onClick={() => seek(effTime + 10)} title="Avançar 10s">
+                  <button onClick={() => seek(effTime + 10)} title="Avançar 10s (→)">
                     <IconForward10 size={21} />
                   </button>
+                  <div className="ctrl-volume">
+                    <button onClick={toggleMute} title={volume === 0 ? "Ativar som (m)" : "Mudo (m)"}>
+                      {volume === 0 ? <IconVolumeMute size={20} /> : <IconVolume size={20} />}
+                    </button>
+                    <input
+                      className="volume"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={volume}
+                      onChange={(e) => setVolume(Number(e.target.value))}
+                      style={{
+                        background: `linear-gradient(to right, #fff ${volume * 100}%, rgba(255,255,255,0.25) ${volume * 100}%)`
+                      }}
+                      title="Volume"
+                    />
+                  </div>
                   <span className="time-label">
                     {fmtClock(effTime)} / {fmtClock(duration)}
                   </span>
                 </div>
                 <div className="controls-right">
                   {data.subtitles.length > 0 && (
-                    <div className="sub-settings" onClick={(e) => e.stopPropagation()}>
+                    <div className="menu-anchor" onClick={(e) => e.stopPropagation()}>
                       <button
-                        className={subPanel ? "active" : undefined}
-                        onClick={() => setSubPanel((p) => !p)}
-                        title="Estilo da legenda"
+                        className={subLang ? "cc-on" : menu === "cc" || menu === "substyle" ? "active" : undefined}
+                        onClick={() => setMenu(menu === "cc" || menu === "substyle" ? null : "cc")}
+                        title="Legendas"
                       >
-                        <IconTypography size={19} />
+                        <IconCC size={20} />
                       </button>
-                      {subPanel && (
-                        <div className="sub-panel">
-                          <div className="sub-panel-title">Estilo da legenda</div>
+                      {menu === "cc" && (
+                        <div className="menu">
+                          <div className="menu-label">Legendas</div>
+                          <button className="menu-item" onClick={() => chooseLang(null)}>
+                            <span className="mi-check">{subLang === null && <IconCheck size={14} />}</span>
+                            Sem legenda
+                          </button>
+                          {data.subtitles.map((s) => (
+                            <button key={s.id} className="menu-item" onClick={() => chooseLang(s.lang)}>
+                              <span className="mi-check">{subLang === s.lang && <IconCheck size={14} />}</span>
+                              {s.lang}
+                            </button>
+                          ))}
+                          <div className="menu-sep" />
+                          <button className="menu-item" onClick={() => setMenu("substyle")}>
+                            <span className="mi-check">
+                              <IconTypography size={15} />
+                            </span>
+                            Estilo da legenda
+                            <span className="mi-arrow">
+                              <IconChevronRight size={13} />
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                      {menu === "substyle" && (
+                        <div className="menu sub-panel">
+                          <button className="menu-item menu-back" onClick={() => setMenu("cc")}>
+                            <IconChevronLeft size={14} /> Estilo da legenda
+                          </button>
                           <label className="sub-panel-row">
                             <span>Tamanho</span>
                             <input
@@ -509,67 +711,69 @@ export default function Player() {
                             />
                             <b>{Math.round(subStyle.bg * 100)}%</b>
                           </label>
-                          <label className="sub-panel-row">
-                            <span>Contorno</span>
-                            <input
-                              type="checkbox"
-                              checked={subStyle.outline}
-                              onChange={(e) => updateSubStyle({ outline: e.target.checked })}
-                            />
-                          </label>
+                          <button
+                            className="menu-item"
+                            onClick={() => updateSubStyle({ outline: !subStyle.outline })}
+                          >
+                            <span className="menu-item-text">Contorno</span>
+                            <span className={subStyle.outline ? "switch on" : "switch"}>
+                              <span className="switch-knob" />
+                            </span>
+                          </button>
                           <div className="sub-panel-note">Vale para todos os cursos</div>
                         </div>
                       )}
                     </div>
                   )}
-                  {data.subtitles.length > 0 && (
-                    <select
-                      value={subLang ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value || null;
-                        setSubLang(v);
-                        if (v) localStorage.setItem(SUB_PREF_KEY, v);
-                        else localStorage.removeItem(SUB_PREF_KEY);
-                      }}
-                      title="Legendas"
+                  <div className="menu-anchor" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className={menu === "settings" ? "active" : undefined}
+                      onClick={() => setMenu(menu === "settings" ? null : "settings")}
+                      title="Configurações"
                     >
-                      <option value="">Sem legenda</option>
-                      {data.subtitles.map((s) => (
-                        <option key={s.id} value={s.lang}>
-                          {s.lang}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <select value={rate} onChange={(e) => setRate(Number(e.target.value))} title="Velocidade">
-                    {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => (
-                      <option key={r} value={r}>
-                        {r}x
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className="volume"
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={volume}
-                    onChange={(e) => setVolume(Number(e.target.value))}
-                    title="Volume"
-                  />
-                  <label className="autonext" title="Ir para a próxima aula automaticamente">
-                    <input
-                      type="checkbox"
-                      checked={autoNext}
-                      onChange={(e) => {
-                        setAutoNext(e.target.checked);
-                        localStorage.setItem(AUTONEXT_KEY, e.target.checked ? "1" : "0");
-                      }}
-                    />
-                    Auto
-                  </label>
-                  <button onClick={toggleFullscreen} title="Tela cheia">
+                      <IconSettings size={20} />
+                    </button>
+                    {menu === "settings" && (
+                      <div className="menu">
+                        <div className="menu-label">Velocidade</div>
+                        <div className="rate-row">
+                          {RATES.map((r) => (
+                            <button
+                              key={r}
+                              className={r === rate ? "rate-pill active" : "rate-pill"}
+                              onClick={() => setRate(r)}
+                            >
+                              {r === 1 ? "Normal" : `${r}x`}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="menu-sep" />
+                        <button
+                          className="menu-item"
+                          onClick={() => {
+                            const v = !autoNext;
+                            setAutoNext(v);
+                            localStorage.setItem(AUTONEXT_KEY, v ? "1" : "0");
+                          }}
+                        >
+                          <span className="menu-item-text">Próxima aula automática</span>
+                          <span className={autoNext ? "switch on" : "switch"}>
+                            <span className="switch-knob" />
+                          </span>
+                        </button>
+                        <button className="menu-item" onClick={() => setCompatMode(!compat)}>
+                          <span className="menu-item-text">
+                            Modo compatibilidade
+                            <small>Recodifica o vídeo — use se travar ou ficar sem imagem</small>
+                          </span>
+                          <span className={compat ? "switch on" : "switch"}>
+                            <span className="switch-knob" />
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={toggleFullscreen} title="Tela cheia (f)">
                     <IconFullscreen size={19} />
                   </button>
                 </div>

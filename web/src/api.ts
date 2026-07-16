@@ -77,6 +77,16 @@ export interface PlayerData {
   directPlay: boolean;
 }
 
+export interface TrickplayMeta {
+  interval: number;
+  tileW: number;
+  tileH: number;
+  cols: number;
+  rows: number;
+  frames: number;
+  sheets: number;
+}
+
 export async function apiGet<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);

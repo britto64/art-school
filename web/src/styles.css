@@ -1040,6 +1040,82 @@ button {
   cursor: pointer;
 }
 
+/* ---------- thumbs de aula ---------- */
+.lesson-thumb {
+  flex: 0 0 96px;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #0b0d13;
+  border: 2px solid var(--border);
+}
+
+.lesson-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lesson-thumb.empty img {
+  display: none; /* mantém o placeholder escuro se a thumb falhar */
+}
+
+.lesson-thumb.small {
+  flex: 0 0 64px;
+  width: 64px;
+  border-radius: 4px;
+  border-width: 1px;
+}
+
+.lesson.done .lesson-thumb {
+  opacity: 0.55;
+}
+
+.lesson-link {
+  justify-content: flex-start;
+}
+
+.lesson-title {
+  flex: 1;
+}
+
+/* ---------- trickplay (preview da timeline) ---------- */
+.seekbar-wrap {
+  position: relative;
+}
+
+.seek-preview {
+  position: absolute;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.seek-preview-img {
+  background-color: #000;
+  background-repeat: no-repeat;
+  border: 2px solid #fff;
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 var(--hard);
+}
+
+.seek-preview-time {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- legendas customizáveis (overlay próprio) ---------- */
 .sub-overlay {
   position: absolute;

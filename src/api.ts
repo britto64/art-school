@@ -4,7 +4,13 @@ import path from "node:path";
 import { config } from "./config.js";
 import { db } from "./db.js";
 import { scanLibrary } from "./scanner.js";
-import { fillMissingDurations, generateThumb, remuxStream } from "./ffmpeg.js";
+import {
+  fillMissingDurations,
+  generateMissingTrickplay,
+  generateThumb,
+  getLessonThumb,
+  remuxStream
+} from "./ffmpeg.js";
 
 export const api = Router();
 
@@ -300,6 +306,19 @@ api.get("/materials/:id/view", (req, res) => {
 });
 
 // ---------- Thumbnails / banners ----------
+const sendJpeg = (res: import("express").Response, img: Uint8Array) => {
+  res.setHeader("Content-Type", "image/jpeg");
+  res.setHeader("Cache-Control", "public, max-age=604800");
+  res.end(Buffer.from(img.buffer, img.byteOffset, img.byteLength));
+};
+
+// thumbnail de uma aula (gera sob demanda e cacheia na db)
+api.get("/thumb/lesson/:id", async (req, res) => {
+  const img = await getLessonThumb(req.params.id);
+  if (!img) return res.status(404).end();
+  sendJpeg(res, img);
+});
+
 api.get("/thumb/:courseId", async (req, res) => {
   const course = db.prepare("SELECT id, banner FROM courses WHERE id = ?").get(req.params.courseId) as
     | { id: string; banner: string | null }
@@ -320,6 +339,35 @@ api.get("/thumb/:courseId", async (req, res) => {
   const thumb = await generateThumb(course.id, absPath(first.rel_path));
   if (!thumb) return res.status(404).end();
   res.sendFile(thumb);
+});
+
+// ---------- Trickplay (preview da timeline) ----------
+api.get("/trickplay/:id", (req, res) => {
+  const tp = db
+    .prepare(
+      "SELECT interval, tile_w, tile_h, tile_cols, tile_rows, frames, sheets FROM trickplay WHERE lesson_id = ?"
+    )
+    .get(req.params.id) as
+    | { interval: number; tile_w: number; tile_h: number; tile_cols: number; tile_rows: number; frames: number; sheets: number }
+    | undefined;
+  if (!tp || tp.frames === 0) return res.status(404).json({ error: "Trickplay indisponível" });
+  res.json({
+    interval: tp.interval,
+    tileW: tp.tile_w,
+    tileH: tp.tile_h,
+    cols: tp.tile_cols,
+    rows: tp.tile_rows,
+    frames: tp.frames,
+    sheets: tp.sheets
+  });
+});
+
+api.get("/trickplay/:id/:sheet", (req, res) => {
+  const row = db
+    .prepare("SELECT img FROM trickplay_sheets WHERE lesson_id = ? AND idx = ?")
+    .get(req.params.id, Number(req.params.sheet) || 0) as { img: Uint8Array } | undefined;
+  if (!row) return res.status(404).end();
+  sendJpeg(res, row.img);
 });
 
 // ---------- Progresso ----------
@@ -361,6 +409,6 @@ api.post("/progress", (req, res) => {
 // ---------- Rescan ----------
 api.post("/scan", (_req, res) => {
   const result = scanLibrary();
-  void fillMissingDurations();
+  void fillMissingDurations().then(() => generateMissingTrickplay());
   res.json(result);
 });

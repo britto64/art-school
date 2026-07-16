@@ -78,6 +78,14 @@ export default function Course() {
                     {l.completed ? <IconCheck size={13} /> : null}
                   </button>
                   <Link to={`/aula/${l.id}`} className="lesson-link">
+                    <span className="lesson-thumb">
+                      <img
+                        loading="lazy"
+                        src={`/api/thumb/lesson/${l.id}`}
+                        alt=""
+                        onError={(e) => e.currentTarget.parentElement?.classList.add("empty")}
+                      />
+                    </span>
                     <span className="lesson-title">{l.title}</span>
                     <span className="lesson-meta">
                       {watchedPct > 0 && watchedPct < 100 && <span className="lesson-pct">{watchedPct}%</span>}

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { api } from "./api.js";
 import { scanLibrary } from "./scanner.js";
-import { fillMissingDurations } from "./ffmpeg.js";
+import { fillMissingDurations, generateMissingTrickplay } from "./ffmpeg.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,5 +28,5 @@ app.listen(config.port, () => {
   console.log(`   Cursos: ${config.coursesPath}`);
   console.log(`   Dados:  ${config.dataPath}`);
   scanLibrary();
-  void fillMissingDurations();
+  void fillMissingDurations().then(() => generateMissingTrickplay());
 });

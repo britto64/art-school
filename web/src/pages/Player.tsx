@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiGet, CourseDetail, fmtClock, fmtDuration, PlayerData, saveProgress } from "../api";
+import { apiGet, CourseDetail, fmtClock, fmtDuration, PlayerData, saveProgress, TrickplayMeta } from "../api";
 import Materials from "../components/Materials";
 import {
   IconCheck,
@@ -68,6 +68,10 @@ export default function Player() {
   const [cueLines, setCueLines] = useState<string[]>([]);
   const [showControls, setShowControls] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  // trickplay: preview de frames ao passar o mouse na timeline
+  const [tp, setTp] = useState<TrickplayMeta | null>(null);
+  const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
+  const seekWrapRef = useRef<HTMLDivElement>(null);
 
   const updateSubStyle = (patch: Partial<SubStyle>) =>
     setSubStyle((s) => {
@@ -103,6 +107,14 @@ export default function Player() {
         setSubLang(pick);
       })
       .catch((e) => setError(String(e)));
+  }, [id]);
+
+  // ---- trickplay ----
+  useEffect(() => {
+    setTp(null);
+    setHover(null);
+    if (!id) return;
+    apiGet<TrickplayMeta>(`/api/trickplay/${id}`).then(setTp).catch(() => {});
   }, [id]);
 
   // ---- curso (sidebar de aulas + materiais) ----
@@ -378,15 +390,53 @@ export default function Player() {
             )}
 
             <div className={showControls ? "controls" : "controls controls-hidden"}>
-              <input
-                className="seekbar"
-                type="range"
-                min={0}
-                max={duration || 1}
-                step={0.1}
-                value={Math.min(effTime, duration || effTime)}
-                onChange={(e) => seek(Number(e.target.value))}
-              />
+              <div
+                ref={seekWrapRef}
+                className="seekbar-wrap"
+                onMouseMove={(e) => {
+                  const rect = seekWrapRef.current?.getBoundingClientRect();
+                  if (!rect || duration <= 0) return;
+                  const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                  const half = (tp ? tp.tileW / 2 : 42) + 6;
+                  const x = Math.min(Math.max(frac * rect.width, half), Math.max(half, rect.width - half));
+                  setHover({ x, time: frac * duration });
+                }}
+                onMouseLeave={() => setHover(null)}
+              >
+                <input
+                  className="seekbar"
+                  type="range"
+                  min={0}
+                  max={duration || 1}
+                  step={0.1}
+                  value={Math.min(effTime, duration || effTime)}
+                  onChange={(e) => seek(Number(e.target.value))}
+                />
+                {hover && (
+                  <div className="seek-preview" style={{ left: hover.x }}>
+                    {tp &&
+                      (() => {
+                        const idx = Math.max(0, Math.min(tp.frames - 1, Math.floor(hover.time / tp.interval)));
+                        const perSheet = tp.cols * tp.rows;
+                        const sheet = Math.floor(idx / perSheet);
+                        const col = (idx % perSheet) % tp.cols;
+                        const row = Math.floor((idx % perSheet) / tp.cols);
+                        return (
+                          <div
+                            className="seek-preview-img"
+                            style={{
+                              width: tp.tileW,
+                              height: tp.tileH,
+                              backgroundImage: `url(/api/trickplay/${data.id}/${sheet})`,
+                              backgroundPosition: `-${col * tp.tileW}px -${row * tp.tileH}px`
+                            }}
+                          />
+                        );
+                      })()}
+                    <div className="seek-preview-time">{fmtClock(hover.time)}</div>
+                  </div>
+                )}
+              </div>
               <div className="controls-row">
                 <div className="controls-left">
                   <button onClick={() => data.prev && navigate(`/aula/${data.prev.id}`)} disabled={!data.prev} title="Aula anterior">
@@ -559,6 +609,14 @@ export default function Player() {
                             ) : (
                               <IconPlayOutline size={12} />
                             )}
+                          </span>
+                          <span className="lesson-thumb small">
+                            <img
+                              loading="lazy"
+                              src={`/api/thumb/lesson/${l.id}`}
+                              alt=""
+                              onError={(e) => e.currentTarget.parentElement?.classList.add("empty")}
+                            />
                           </span>
                           <span className="sidebar-lesson-title">{l.title}</span>
                           <span className="sidebar-lesson-dur">{fmtDuration(l.duration)}</span>

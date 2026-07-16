@@ -23,7 +23,7 @@ Requisitos: Node 22.13+ (usa `node:sqlite`) e **ffmpeg/ffprobe no PATH** (thumbn
 - `src/scanner.ts` — varre `COURSES_PATH` e reconstrói o catálogo (cursos/aulas/materiais/legendas)
 - `src/api.ts` — rotas REST (`/api/...`): streaming com Range, remux mkv→mp4 via ffmpeg, SRT→VTT, progresso, thumbs
 - `src/db.ts` — schema SQLite; **a tabela `progress` nunca é apagada no rescan**
-- `src/ffmpeg.ts` — ffprobe (durações), thumbnails, remux
+- `src/ffmpeg.ts` — ffprobe (durações), thumbnails (curso e por aula), trickplay (sprite sheets do preview da timeline, gerado em segundo plano e salvo como BLOB no SQLite), remux
 - `web/` — SPA React (pt-BR): Home (banners + progresso), Curso (seções/aulas/materiais), Player
 
 ## Regras importantes

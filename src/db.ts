@@ -54,6 +54,32 @@ CREATE TABLE IF NOT EXISTS subtitles (
   rel_path  TEXT NOT NULL
 );
 
+-- Thumbnail de cada aula (JPEG pequeno, gerado sob demanda)
+CREATE TABLE IF NOT EXISTS lesson_thumbs (
+  lesson_id TEXT PRIMARY KEY,
+  img       BLOB NOT NULL
+);
+
+-- Trickplay: preview da timeline (sprite sheets JPEG bem comprimidas)
+-- frames = 0 marca "falhou/indisponível" para não tentar de novo a cada boot
+CREATE TABLE IF NOT EXISTS trickplay (
+  lesson_id  TEXT PRIMARY KEY,
+  interval   REAL NOT NULL,
+  tile_w     INTEGER NOT NULL,
+  tile_h     INTEGER NOT NULL,
+  tile_cols  INTEGER NOT NULL,
+  tile_rows  INTEGER NOT NULL,
+  frames     INTEGER NOT NULL,
+  sheets     INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS trickplay_sheets (
+  lesson_id TEXT NOT NULL,
+  idx       INTEGER NOT NULL,
+  img       BLOB NOT NULL,
+  PRIMARY KEY (lesson_id, idx)
+);
+
 -- Progresso é persistente: nunca é apagado no rescan.
 -- lesson_id = hash do caminho relativo, então sobrevive à migração para o NAS.
 CREATE TABLE IF NOT EXISTS progress (

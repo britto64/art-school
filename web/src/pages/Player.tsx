@@ -144,25 +144,33 @@ export default function Player() {
     else v.pause();
   };
 
-  const markDoneLocal = () => {
-    // atualiza o ✓ na sidebar sem esperar refetch
+  const markDoneLocal = (value: boolean) => {
+    // atualiza o ✓ na sidebar e o botão sem esperar refetch
+    setData((d) => (d ? { ...d, completed: value ? 1 : 0 } : d));
     setCourse((c) =>
       c
         ? {
             ...c,
             sections: c.sections.map((s) => ({
               ...s,
-              lessons: s.lessons.map((l) => (l.id === data?.id ? { ...l, completed: 1 } : l))
+              lessons: s.lessons.map((l) => (l.id === data?.id ? { ...l, completed: value ? 1 : 0 } : l))
             }))
           }
         : c
     );
   };
 
+  const toggleWatched = () => {
+    if (!data) return;
+    const value = !data.completed;
+    void saveProgress(data.id, effTime, value);
+    markDoneLocal(value);
+  };
+
   const onEnded = () => {
     if (!data) return;
     void saveProgress(data.id, duration || effTime, true);
-    markDoneLocal();
+    markDoneLocal(true);
     if (autoNext && data.next) navigate(`/aula/${data.next.id}`);
   };
 
@@ -220,7 +228,16 @@ export default function Player() {
       <div className="player-layout">
         {/* ---- coluna esquerda: título + player + materiais ---- */}
         <div className="player-main">
-          <h1 className="player-title">{data.title}</h1>
+          <div className="player-title-row">
+            <h1 className="player-title">{data.title}</h1>
+            <button
+              className={data.completed ? "btn-watched active" : "btn-watched"}
+              onClick={toggleWatched}
+              title={data.completed ? "Marcar como não vista" : "Marcar como vista"}
+            >
+              {data.completed ? "✓ Aula vista" : "Marcar como vista"}
+            </button>
+          </div>
 
           <div
             ref={wrapRef}

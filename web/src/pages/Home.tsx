@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, fmtClock, HomeData } from "../api";
+import { apiGet, fmtClock, fmtDuration, HomeData } from "../api";
 
 export default function Home() {
   const [data, setData] = useState<HomeData | null>(null);
@@ -65,6 +65,7 @@ export default function Home() {
                   </div>
                   <span className="progress-label">
                     {c.completedCount}/{c.lessonCount} aulas · {c.progressPct}%
+                    {c.totalDuration ? ` · ${fmtDuration(c.totalDuration)}` : ""}
                   </span>
                 </div>
               </div>

@@ -6,6 +6,7 @@ export interface CourseSummary {
   hasBanner: boolean;
   lessonCount: number;
   completedCount: number;
+  totalDuration: number | null;
   progressPct: number;
   lastWatched: string | null;
 }
@@ -33,13 +34,33 @@ export interface LessonRow {
   completed: number;
 }
 
+export type MaterialKind =
+  | "video"
+  | "image"
+  | "pdf"
+  | "text"
+  | "audio"
+  | "brush"
+  | "psd"
+  | "clip"
+  | "archive"
+  | "other";
+
+export interface MaterialRow {
+  id: string;
+  name: string;
+  size: number;
+  kind: MaterialKind;
+  viewable: boolean;
+}
+
 export interface CourseDetail {
   id: string;
   title: string;
   category: string | null;
   status: string;
   sections: { title: string | null; lessons: LessonRow[] }[];
-  materials: { id: string; name: string; size: number }[];
+  materials: MaterialRow[];
 }
 
 export interface PlayerData {

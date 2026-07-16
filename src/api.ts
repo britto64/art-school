@@ -13,6 +13,27 @@ const absPath = (relPath: string) => path.join(config.coursesPath, relPath);
 // mp4/webm tocam direto no browser; o resto (mkv, avi, mov) passa por remux
 const DIRECT_PLAY = new Set([".mp4", ".m4v", ".webm"]);
 
+// ---------- tipos de material ----------
+export type MaterialKind = "video" | "image" | "pdf" | "text" | "audio" | "brush" | "psd" | "clip" | "archive" | "other";
+
+const KIND_BY_EXT: Record<string, MaterialKind> = {
+  ".mov": "video", ".mp4": "video", ".m4v": "video", ".mkv": "video", ".webm": "video", ".avi": "video",
+  ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image", ".webp": "image", ".bmp": "image",
+  ".pdf": "pdf",
+  ".txt": "text", ".md": "text",
+  ".mp3": "audio", ".wav": "audio", ".m4a": "audio", ".ogg": "audio",
+  ".abr": "brush",
+  ".psd": "psd", ".psb": "psd",
+  ".clip": "clip",
+  ".zip": "archive", ".rar": "archive", ".7z": "archive"
+};
+
+// tipos que o navegador consegue abrir direto (ou via remux, no caso de vídeo)
+const VIEWABLE: Set<MaterialKind> = new Set(["video", "image", "pdf", "text", "audio"]);
+
+const materialKind = (relPath: string): MaterialKind =>
+  KIND_BY_EXT[path.extname(relPath).toLowerCase()] ?? "other";
+
 interface CourseSummary {
   id: string;
   title: string;
@@ -21,6 +42,7 @@ interface CourseSummary {
   banner: string | null;
   lesson_count: number;
   completed_count: number;
+  total_duration: number | null;
   last_watched: string | null;
 }
 
@@ -31,6 +53,7 @@ api.get("/courses", (_req, res) => {
       `SELECT c.id, c.title, c.category, c.status, c.banner,
               COUNT(l.id) AS lesson_count,
               COALESCE(SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END), 0) AS completed_count,
+              SUM(l.duration) AS total_duration,
               MAX(p.updated_at) AS last_watched
        FROM courses c
        LEFT JOIN lessons l ON l.course_id = c.id
@@ -63,6 +86,7 @@ api.get("/courses", (_req, res) => {
       hasBanner: c.status === "ready" || c.banner !== null,
       lessonCount: c.lesson_count,
       completedCount: c.completed_count,
+      totalDuration: c.total_duration,
       progressPct: c.lesson_count > 0 ? Math.round((c.completed_count / c.lesson_count) * 100) : 0,
       lastWatched: c.last_watched
     })),
@@ -104,9 +128,14 @@ api.get("/courses/:id", (req, res) => {
     else last.lessons.push(l);
   }
 
-  const materials = db
-    .prepare("SELECT id, name, size FROM materials WHERE course_id = ? ORDER BY name")
-    .all(req.params.id);
+  const materials = (
+    db
+      .prepare("SELECT id, name, size, rel_path FROM materials WHERE course_id = ? ORDER BY name")
+      .all(req.params.id) as unknown as { id: string; name: string; size: number; rel_path: string }[]
+  ).map((m) => {
+    const kind = materialKind(m.rel_path);
+    return { id: m.id, name: m.name, size: m.size, kind, viewable: VIEWABLE.has(kind) };
+  });
 
   res.json({ ...course, sections, materials });
 });
@@ -232,6 +261,42 @@ api.get("/materials/:id", (req, res) => {
   const file = absPath(mat.rel_path);
   if (!fs.existsSync(file)) return res.status(404).end();
   res.download(file, path.basename(mat.rel_path));
+});
+
+// visualizar material no navegador (imagem/pdf/txt direto; vídeo via remux se preciso)
+api.get("/materials/:id/view", (req, res) => {
+  const mat = db.prepare("SELECT rel_path FROM materials WHERE id = ?").get(req.params.id) as
+    | { rel_path: string }
+    | undefined;
+  if (!mat) return res.status(404).end();
+  const file = absPath(mat.rel_path);
+  if (!fs.existsSync(file)) return res.status(404).end();
+
+  const ext = path.extname(file).toLowerCase();
+  const kind = materialKind(mat.rel_path);
+
+  if (kind === "video" && !DIRECT_PLAY.has(ext)) {
+    // .mov/.mkv/.avi: remux para mp4 fragmentado, igual às aulas
+    res.setHeader("Content-Type", "video/mp4");
+    const ff = remuxStream(file, 0, false);
+    ff.stdout.pipe(res);
+    const kill = () => {
+      try {
+        ff.kill("SIGKILL");
+      } catch {}
+    };
+    res.on("close", kill);
+    ff.on("error", () => res.destroy());
+    return;
+  }
+
+  if (!VIEWABLE.has(kind)) {
+    // não dá para abrir no navegador — cai no download
+    return res.download(file, path.basename(mat.rel_path));
+  }
+
+  if (kind === "text") res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.sendFile(file); // sendFile já cuida de Content-Type e Range (seek de vídeo mp4)
 });
 
 // ---------- Thumbnails / banners ----------

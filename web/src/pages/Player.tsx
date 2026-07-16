@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiGet, CourseDetail, fmtClock, fmtDuration, fmtSize, PlayerData, saveProgress } from "../api";
+import { apiGet, CourseDetail, fmtClock, fmtDuration, PlayerData, saveProgress } from "../api";
+import Materials from "../components/Materials";
 
 const SUB_PREF_KEY = "artschool.sublang";
 const AUTONEXT_KEY = "artschool.autonext";
@@ -363,24 +364,7 @@ export default function Player() {
           </div>
 
           {/* ---- materiais embaixo do player ---- */}
-          {course && course.materials.length > 0 && (
-            <details className="section player-materials">
-              <summary>
-                <span className="section-title">📎 Material do curso</span>
-                <span className="section-meta">{course.materials.length} arquivos</span>
-              </summary>
-              <ul className="material-list">
-                {course.materials.map((m) => (
-                  <li key={m.id}>
-                    <a href={`/api/materials/${m.id}`} download>
-                      {m.name}
-                    </a>
-                    <span className="material-size">{fmtSize(m.size)}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
+          {course && <Materials materials={course.materials} title="Material do curso" />}
         </div>
 
         {/* ---- coluna direita: aulas do curso ---- */}

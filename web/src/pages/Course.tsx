@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { apiGet, CourseDetail, fmtDuration, fmtSize, saveProgress } from "../api";
+import { apiGet, CourseDetail, fmtDuration, saveProgress } from "../api";
+import Materials from "../components/Materials";
 
 export default function Course() {
   const { id } = useParams<{ id: string }>();
@@ -88,24 +89,7 @@ export default function Course() {
         </details>
       ))}
 
-      {course.materials.length > 0 && (
-        <details className="section">
-          <summary>
-            <span className="section-title">📎 Materiais</span>
-            <span className="section-meta">{course.materials.length} arquivos</span>
-          </summary>
-          <ul className="material-list">
-            {course.materials.map((m) => (
-              <li key={m.id}>
-                <a href={`/api/materials/${m.id}`} download>
-                  {m.name}
-                </a>
-                <span className="material-size">{fmtSize(m.size)}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <Materials materials={course.materials} title="Materiais" />
     </div>
   );
 }

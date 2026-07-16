@@ -492,32 +492,77 @@ button {
 
 .material-list li {
   display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 7px 0;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
   font-size: 13.5px;
+  min-width: 0;
 }
 
 .material-list li:last-child {
   border-bottom: none;
 }
 
-.material-list a {
-  color: var(--accent);
+.material-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.material-name {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.material-list a:hover {
-  text-decoration: underline;
+.material-kind {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 
 .material-size {
   color: var(--text-dim);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+  min-width: 70px;
+  text-align: right;
+}
+
+.material-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.material-btn {
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: 0.13s;
+  white-space: nowrap;
+}
+
+.material-btn:hover {
+  border-color: var(--accent);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+@media (max-width: 640px) {
+  .material-kind,
+  .material-size {
+    display: none;
+  }
 }
 
 /* ---------- player ---------- */

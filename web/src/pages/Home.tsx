@@ -102,10 +102,14 @@ export default function Home() {
                 <div className="continue-info">
                   <span className="continue-lesson">{item.lessonTitle}</span>
                   <span className="continue-course">{item.courseTitle}</span>
-                  <span className="continue-time">
-                    {fmtClock(item.position)}
-                    {item.duration ? ` / ${fmtClock(item.duration)}` : ""}
-                  </span>
+                  {item.isNext ? (
+                    <span className="continue-time next">Próxima aula</span>
+                  ) : (
+                    <span className="continue-time">
+                      {fmtClock(item.position)}
+                      {item.duration ? ` / ${fmtClock(item.duration)}` : ""}
+                    </span>
+                  )}
                 </div>
               </Link>
             ))}

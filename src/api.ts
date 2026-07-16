@@ -81,19 +81,79 @@ api.get("/courses", (_req, res) => {
     )
     .all() as unknown as CourseSummary[];
 
-  const continueWatching = db
+  // atividade recente (em andamento OU concluída) — um card por curso:
+  // aula pela metade continua de onde parou; aula concluída sugere a próxima do curso
+  const recent = db
     .prepare(
       `SELECT p.lesson_id AS lessonId, p.position_sec AS position, p.updated_at AS updatedAt,
-              l.title AS lessonTitle, l.duration, l.course_id AS courseId,
-              c.title AS courseTitle
+              p.completed, l.title AS lessonTitle, l.duration, l.course_id AS courseId,
+              l.section_order AS sectionOrder, l.sort_order AS sortOrder, c.title AS courseTitle
        FROM progress p
        JOIN lessons l ON l.id = p.lesson_id
        JOIN courses c ON c.id = l.course_id
-       WHERE p.completed = 0 AND p.position_sec > 10
+       WHERE p.completed = 1 OR p.position_sec > 10
        ORDER BY p.updated_at DESC
-       LIMIT 10`
+       LIMIT 40`
     )
-    .all();
+    .all() as unknown as {
+    lessonId: string;
+    position: number;
+    updatedAt: string;
+    completed: number;
+    lessonTitle: string;
+    duration: number | null;
+    courseId: string;
+    sectionOrder: number;
+    sortOrder: number;
+    courseTitle: string;
+  }[];
+
+  const nextLessonStmt = db.prepare(
+    `SELECT l.id AS lessonId, l.title AS lessonTitle, l.duration,
+            COALESCE(p.position_sec, 0) AS position
+     FROM lessons l
+     LEFT JOIN progress p ON p.lesson_id = l.id
+     WHERE l.course_id = ? AND COALESCE(p.completed, 0) = 0
+     ORDER BY (l.section_order > ? OR (l.section_order = ? AND l.sort_order > ?)) DESC,
+              l.section_order, l.sort_order
+     LIMIT 1`
+  );
+
+  const continueWatching: Record<string, unknown>[] = [];
+  const seenCourses = new Set<string>();
+  for (const r of recent) {
+    if (continueWatching.length >= 10) break;
+    if (seenCourses.has(r.courseId)) continue;
+    seenCourses.add(r.courseId);
+    if (!r.completed) {
+      continueWatching.push({
+        lessonId: r.lessonId,
+        position: r.position,
+        updatedAt: r.updatedAt,
+        lessonTitle: r.lessonTitle,
+        duration: r.duration,
+        courseId: r.courseId,
+        courseTitle: r.courseTitle,
+        isNext: false
+      });
+    } else {
+      // próxima aula não concluída (preferindo a seguinte na ordem; curso 100% fica de fora)
+      const next = nextLessonStmt.get(r.courseId, r.sectionOrder, r.sectionOrder, r.sortOrder) as
+        | { lessonId: string; lessonTitle: string; duration: number | null; position: number }
+        | undefined;
+      if (!next) continue;
+      continueWatching.push({
+        lessonId: next.lessonId,
+        position: next.position,
+        updatedAt: r.updatedAt,
+        lessonTitle: next.lessonTitle,
+        duration: next.duration,
+        courseId: r.courseId,
+        courseTitle: r.courseTitle,
+        isNext: true
+      });
+    }
+  }
 
   res.json({
     courses: courses.map((c) => ({
@@ -505,8 +565,14 @@ api.post("/progress", (req, res) => {
       | { completed: number }
       | undefined;
     done = existing?.completed ?? 0;
-    // completa automaticamente ao assistir >= 90%
-    if (!done && lesson.duration && pos / lesson.duration >= 0.9) done = 1;
+    // completa automaticamente: >= 90% assistido, ou faltando <= 30s pro fim
+    // (regra dos 30s só em aulas > 60s, senão vídeos curtos completariam no primeiro save)
+    if (
+      !done &&
+      lesson.duration &&
+      (pos / lesson.duration >= 0.9 || (lesson.duration > 60 && lesson.duration - pos <= 30))
+    )
+      done = 1;
   }
 
   db.prepare(

@@ -22,6 +22,7 @@ export interface ContinueItem {
   duration: number | null;
   courseId: string;
   courseTitle: string;
+  isNext: boolean; // sugestão da próxima aula (a anterior foi concluída)
 }
 
 export interface HomeData {

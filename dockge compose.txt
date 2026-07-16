@@ -7,8 +7,7 @@ services:
     ports:
       - "3011:3000"
     volumes:
-      # ajuste o caminho da esquerda para onde os cursos ficarem no NAS
-      - /mnt/StorageHD1/media/cursos:/courses:ro
+      - /mnt/StorageHD1/artschool/cursos:/courses:ro
       - /mnt/StorageHD1/configs/artschool:/app/data
     environment:
       - COURSES_PATH=/courses

@@ -13,12 +13,37 @@ import {
   IconPlayOutline,
   IconRewind10,
   IconSkipNext,
-  IconSkipPrev
+  IconSkipPrev,
+  IconTypography
 } from "../components/Icons";
 
 const SUB_PREF_KEY = "artschool.sublang";
 const AUTONEXT_KEY = "artschool.autonext";
 const RATE_KEY = "artschool.rate";
+const SUBSTYLE_KEY = "artschool.substyle";
+
+// estilo global das legendas (vale para todos os cursos)
+interface SubStyle {
+  size: number; // px
+  color: string;
+  bg: number; // opacidade do fundo 0..1
+  outline: boolean;
+}
+
+const DEFAULT_SUBSTYLE: SubStyle = { size: 22, color: "#ffffff", bg: 0.75, outline: false };
+
+const SUB_COLORS = ["#ffffff", "#fde047", "#4ade80", "#67e8f9", "#f9a8d4"];
+
+function loadSubStyle(): SubStyle {
+  try {
+    return { ...DEFAULT_SUBSTYLE, ...JSON.parse(localStorage.getItem(SUBSTYLE_KEY) ?? "{}") };
+  } catch {
+    return DEFAULT_SUBSTYLE;
+  }
+}
+
+// mantém só <i>/<b>/<u> do texto da legenda
+const sanitizeCue = (t: string) => t.replace(/<(?!\/?(i|b|u)\b)[^>]*>/gi, "");
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
@@ -38,8 +63,18 @@ export default function Player() {
   const [rate, setRate] = useState(() => Number(localStorage.getItem(RATE_KEY) ?? 1));
   const [autoNext, setAutoNext] = useState(() => localStorage.getItem(AUTONEXT_KEY) !== "0");
   const [subLang, setSubLang] = useState<string | null>(null);
+  const [subStyle, setSubStyle] = useState<SubStyle>(loadSubStyle);
+  const [subPanel, setSubPanel] = useState(false);
+  const [cueLines, setCueLines] = useState<string[]>([]);
   const [showControls, setShowControls] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const updateSubStyle = (patch: Partial<SubStyle>) =>
+    setSubStyle((s) => {
+      const next = { ...s, ...patch };
+      localStorage.setItem(SUBSTYLE_KEY, JSON.stringify(next));
+      return next;
+    });
 
   // ---- carga da aula ----
   useEffect(() => {
@@ -112,15 +147,39 @@ export default function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.id]);
 
-  // ---- legendas ----
+  // ---- legendas: renderização própria (overlay customizável) ----
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    setCueLines([]);
+    let active: TextTrack | null = null;
     for (let i = 0; i < v.textTracks.length; i++) {
       const t = v.textTracks[i];
-      t.mode = subLang !== null && t.label === subLang ? "showing" : "hidden";
+      t.mode = "hidden"; // nunca usa o render nativo
+      if (subLang !== null && t.label === subLang) active = t;
     }
+    if (!active) return;
+    const track = active;
+    const onCue = () => {
+      const lines: string[] = [];
+      const cues = track.activeCues;
+      if (cues) {
+        for (let i = 0; i < cues.length; i++) {
+          const cue = cues[i] as VTTCue;
+          lines.push(...cue.text.split("\n").filter((l) => l.trim() !== ""));
+        }
+      }
+      setCueLines(lines);
+    };
+    track.addEventListener("cuechange", onCue);
+    onCue();
+    return () => track.removeEventListener("cuechange", onCue);
   }, [subLang, src, data]);
+
+  // fecha o painel de estilo junto com os controles
+  useEffect(() => {
+    if (!showControls) setSubPanel(false);
+  }, [showControls]);
 
   // ---- volume / velocidade ----
   useEffect(() => {
@@ -296,6 +355,28 @@ export default function Player() {
               ))}
             </video>
 
+            {subLang && cueLines.length > 0 && (
+              <div
+                className={showControls ? "sub-overlay raised" : "sub-overlay"}
+                style={{ fontSize: subStyle.size }}
+              >
+                {cueLines.map((line, i) => (
+                  <span
+                    key={i}
+                    className="sub-line"
+                    style={{
+                      color: subStyle.color,
+                      background: `rgba(0, 0, 0, ${subStyle.bg})`,
+                      textShadow: subStyle.outline
+                        ? "2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000"
+                        : undefined
+                    }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeCue(line) }}
+                  />
+                ))}
+              </div>
+            )}
+
             <div className={showControls ? "controls" : "controls controls-hidden"}>
               <input
                 className="seekbar"
@@ -328,6 +409,69 @@ export default function Player() {
                   </span>
                 </div>
                 <div className="controls-right">
+                  {data.subtitles.length > 0 && (
+                    <div className="sub-settings" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className={subPanel ? "active" : undefined}
+                        onClick={() => setSubPanel((p) => !p)}
+                        title="Estilo da legenda"
+                      >
+                        <IconTypography size={19} />
+                      </button>
+                      {subPanel && (
+                        <div className="sub-panel">
+                          <div className="sub-panel-title">Estilo da legenda</div>
+                          <label className="sub-panel-row">
+                            <span>Tamanho</span>
+                            <input
+                              type="range"
+                              min={14}
+                              max={42}
+                              step={1}
+                              value={subStyle.size}
+                              onChange={(e) => updateSubStyle({ size: Number(e.target.value) })}
+                            />
+                            <b>{subStyle.size}</b>
+                          </label>
+                          <div className="sub-panel-row">
+                            <span>Cor</span>
+                            <span className="sub-swatches">
+                              {SUB_COLORS.map((c) => (
+                                <button
+                                  key={c}
+                                  className={subStyle.color === c ? "swatch active" : "swatch"}
+                                  style={{ background: c }}
+                                  onClick={() => updateSubStyle({ color: c })}
+                                  title={c}
+                                />
+                              ))}
+                            </span>
+                          </div>
+                          <label className="sub-panel-row">
+                            <span>Fundo</span>
+                            <input
+                              type="range"
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={subStyle.bg}
+                              onChange={(e) => updateSubStyle({ bg: Number(e.target.value) })}
+                            />
+                            <b>{Math.round(subStyle.bg * 100)}%</b>
+                          </label>
+                          <label className="sub-panel-row">
+                            <span>Contorno</span>
+                            <input
+                              type="checkbox"
+                              checked={subStyle.outline}
+                              onChange={(e) => updateSubStyle({ outline: e.target.checked })}
+                            />
+                          </label>
+                          <div className="sub-panel-note">Vale para todos os cursos</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {data.subtitles.length > 0 && (
                     <select
                       value={subLang ?? ""}

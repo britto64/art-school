@@ -184,6 +184,15 @@ export const IconRefresh = (p: IconProps) => (
   </Svg>
 );
 
+export const IconTypography = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+    <text x="12" y="16" fontSize="10" fontWeight="800" fill="currentColor" stroke="none" textAnchor="middle">
+      Aa
+    </text>
+  </Svg>
+);
+
 /** Logo: A de Arte com um play no lugar do vão */
 export function Logo({ size = 30 }: { size?: number }) {
   return (

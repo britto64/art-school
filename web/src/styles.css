@@ -1040,10 +1040,123 @@ button {
   cursor: pointer;
 }
 
-video::cue {
-  background: rgba(0, 0, 0, 0.75);
-  color: #fff;
-  font-size: 1.05em;
+/* ---------- legendas customizáveis (overlay próprio) ---------- */
+.sub-overlay {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  bottom: 5%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 1;
+  transition: bottom 0.2s;
+}
+
+.sub-overlay.raised {
+  bottom: 90px; /* sobe quando os controles aparecem */
+}
+
+.sub-line {
+  padding: 3px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  max-width: 100%;
+}
+
+.controls {
+  z-index: 2;
+}
+
+.sub-settings {
+  position: relative;
+  display: flex;
+}
+
+.sub-settings > button.active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sub-panel {
+  position: absolute;
+  bottom: 46px;
+  right: 0;
+  width: 250px;
+  background: var(--bg-card);
+  border: 2px solid var(--text);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--hard);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: default;
+}
+
+.sub-panel-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sub-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.sub-panel-row > span:first-child {
+  flex: 0 0 62px;
+  font-weight: 700;
+}
+
+.sub-panel-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-strong);
+}
+
+.sub-panel-row b {
+  min-width: 32px;
+  text-align: right;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.sub-swatches {
+  display: flex;
+  gap: 7px;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 0;
+  transition: 0.12s;
+}
+
+.swatch:hover {
+  transform: scale(1.12);
+}
+
+.swatch.active {
+  border-color: var(--text);
+  box-shadow: 2px 2px 0 var(--hard);
+}
+
+.sub-panel-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
 }
 
 /* ---------- responsivo ---------- */

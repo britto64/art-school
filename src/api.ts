@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, raw } from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
@@ -6,6 +6,7 @@ import { db } from "./db.js";
 import { scanLibrary } from "./scanner.js";
 import {
   fillMissingDurations,
+  generateFrameFromLesson,
   generateMissingTrickplay,
   generateThumb,
   getLessonThumb,
@@ -44,11 +45,14 @@ interface CourseSummary {
   id: string;
   title: string;
   category: string | null;
+  teacher: string | null;
   status: string;
   banner: string | null;
   lesson_count: number;
   completed_count: number;
+  section_count: number;
   total_duration: number | null;
+  missing_durations: number;
   last_watched: string | null;
 }
 
@@ -56,16 +60,23 @@ interface CourseSummary {
 api.get("/courses", (_req, res) => {
   const courses = db
     .prepare(
-      `SELECT c.id, c.title, c.category, c.status, c.banner,
+      `SELECT c.id,
+              COALESCE(m.title, c.title) AS title,
+              COALESCE(m.category, c.category) AS category,
+              m.teacher AS teacher,
+              c.status, c.banner,
               COUNT(l.id) AS lesson_count,
               COALESCE(SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END), 0) AS completed_count,
+              COUNT(DISTINCT l.section) AS section_count,
               SUM(l.duration) AS total_duration,
+              COALESCE(SUM(CASE WHEN l.id IS NOT NULL AND l.duration IS NULL THEN 1 ELSE 0 END), 0) AS missing_durations,
               MAX(p.updated_at) AS last_watched
        FROM courses c
+       LEFT JOIN course_meta m ON m.course_id = c.id
        LEFT JOIN lessons l ON l.course_id = c.id
        LEFT JOIN progress p ON p.lesson_id = l.id
        GROUP BY c.id
-       ORDER BY c.sort_title`
+       ORDER BY LOWER(COALESCE(m.title, c.sort_title))`
     )
     .all() as unknown as CourseSummary[];
 
@@ -88,11 +99,15 @@ api.get("/courses", (_req, res) => {
       id: c.id,
       title: c.title,
       category: c.category,
+      teacher: c.teacher,
       status: c.status,
       hasBanner: c.status === "ready" || c.banner !== null,
       lessonCount: c.lesson_count,
       completedCount: c.completed_count,
+      sectionCount: c.section_count,
       totalDuration: c.total_duration,
+      // durações ainda sendo calculadas pelo ffprobe: o total exibido é parcial
+      durationPartial: c.missing_durations > 0,
       progressPct: c.lesson_count > 0 ? Math.round((c.completed_count / c.lesson_count) * 100) : 0,
       lastWatched: c.last_watched
     })),
@@ -102,9 +117,14 @@ api.get("/courses", (_req, res) => {
 
 // ---------- Página do curso ----------
 api.get("/courses/:id", (req, res) => {
-  const course = db.prepare("SELECT * FROM courses WHERE id = ?").get(req.params.id) as
-    | Record<string, unknown>
-    | undefined;
+  const course = db
+    .prepare(
+      `SELECT c.*, m.title AS meta_title, m.category AS meta_category, m.teacher AS teacher,
+              (m.banner IS NOT NULL) AS has_custom_banner
+       FROM courses c LEFT JOIN course_meta m ON m.course_id = c.id
+       WHERE c.id = ?`
+    )
+    .get(req.params.id) as Record<string, unknown> | undefined;
   if (!course) return res.status(404).json({ error: "Curso não encontrado" });
 
   const lessons = db
@@ -143,7 +163,87 @@ api.get("/courses/:id", (req, res) => {
     return { id: m.id, name: m.name, size: m.size, kind, viewable: VIEWABLE.has(kind) };
   });
 
-  res.json({ ...course, sections, materials });
+  res.json({
+    ...course,
+    title: course.meta_title ?? course.title,
+    category: course.meta_category ?? course.category,
+    teacher: course.teacher ?? null,
+    // valores derivados da pasta (para o formulário de edição saber o "padrão")
+    folderTitle: course.title,
+    folderCategory: course.category,
+    hasCustomBanner: Boolean(course.has_custom_banner),
+    sections,
+    materials
+  });
+});
+
+// ---------- Edição de metadados do curso ----------
+const courseExists = (id: string) => db.prepare("SELECT 1 FROM courses WHERE id = ?").get(id) !== undefined;
+
+api.put("/courses/:id/meta", (req, res) => {
+  if (!courseExists(req.params.id)) return res.status(404).json({ error: "Curso não encontrado" });
+  const norm = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
+  const { title, category, teacher } = req.body as Record<string, unknown>;
+  db.prepare(
+    `INSERT INTO course_meta (course_id, title, category, teacher) VALUES (?, ?, ?, ?)
+     ON CONFLICT(course_id) DO UPDATE SET title = excluded.title,
+       category = excluded.category, teacher = excluded.teacher`
+  ).run(req.params.id, norm(title), norm(category), norm(teacher));
+  res.json({ ok: true });
+});
+
+// aulas espalhadas pelo curso para o usuário escolher um frame como banner
+api.get("/courses/:id/thumb-suggestions", (req, res) => {
+  const lessons = db
+    .prepare("SELECT id, title FROM lessons WHERE course_id = ? ORDER BY section_order, sort_order")
+    .all(req.params.id) as unknown as { id: string; title: string }[];
+  const n = Math.min(8, lessons.length);
+  const picks: { id: string; title: string }[] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < n; i++) {
+    const idx = n === 1 ? 0 : Math.floor((i * (lessons.length - 1)) / (n - 1));
+    if (!seen.has(idx)) {
+      seen.add(idx);
+      picks.push(lessons[idx]);
+    }
+  }
+  res.json(picks);
+});
+
+const saveBanner = (courseId: string, img: Uint8Array | null, mime: string | null) =>
+  db.prepare(
+    `INSERT INTO course_meta (course_id, banner, banner_mime) VALUES (?, ?, ?)
+     ON CONFLICT(course_id) DO UPDATE SET banner = excluded.banner, banner_mime = excluded.banner_mime`
+  ).run(courseId, img, mime);
+
+// upload de imagem (corpo raw: image/jpeg, image/png, image/webp)
+api.post("/courses/:id/banner", raw({ type: "image/*", limit: "15mb" }), (req, res) => {
+  if (!courseExists(req.params.id)) return res.status(404).json({ error: "Curso não encontrado" });
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0)
+    return res.status(400).json({ error: "Envie a imagem no corpo da requisição (Content-Type image/*)" });
+  saveBanner(req.params.id, req.body, req.headers["content-type"] ?? "image/jpeg");
+  res.json({ ok: true });
+});
+
+// usa um frame de uma aula como banner
+api.post("/courses/:id/banner/from-lesson", async (req, res) => {
+  const { lessonId } = req.body as { lessonId?: string };
+  if (!lessonId) return res.status(400).json({ error: "lessonId obrigatório" });
+  const lesson = db.prepare("SELECT course_id FROM lessons WHERE id = ?").get(lessonId) as
+    | { course_id: string }
+    | undefined;
+  if (!lesson || lesson.course_id !== req.params.id)
+    return res.status(404).json({ error: "Aula não encontrada neste curso" });
+  const img = await generateFrameFromLesson(lessonId);
+  if (!img) return res.status(500).json({ error: "Não foi possível extrair o frame" });
+  saveBanner(req.params.id, img, "image/jpeg");
+  res.json({ ok: true });
+});
+
+// remove a imagem customizada (volta pro cover.jpg / frame automático)
+api.delete("/courses/:id/banner", (req, res) => {
+  db.prepare("UPDATE course_meta SET banner = NULL, banner_mime = NULL WHERE course_id = ?").run(req.params.id);
+  res.json({ ok: true });
 });
 
 // ---------- Payload do player ----------
@@ -325,7 +425,17 @@ api.get("/thumb/:courseId", async (req, res) => {
     | undefined;
   if (!course) return res.status(404).end();
 
-  // cover.jpg manual tem prioridade
+  // imagem escolhida/enviada pelo usuário tem prioridade máxima
+  const meta = db
+    .prepare("SELECT banner, banner_mime FROM course_meta WHERE course_id = ?")
+    .get(course.id) as { banner: Uint8Array | null; banner_mime: string | null } | undefined;
+  if (meta?.banner) {
+    res.setHeader("Content-Type", meta.banner_mime ?? "image/jpeg");
+    res.setHeader("Cache-Control", "no-cache");
+    return res.end(Buffer.from(meta.banner.buffer, meta.banner.byteOffset, meta.banner.byteLength));
+  }
+
+  // depois, cover.jpg manual na pasta
   if (course.banner) {
     const file = absPath(course.banner);
     if (fs.existsSync(file)) return res.sendFile(file);

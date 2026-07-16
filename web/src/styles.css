@@ -1116,6 +1116,426 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- rows horizontais (home) ---------- */
+.scroll-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 4px 12px;
+  scroll-snap-type: x proximity;
+}
+
+.scroll-row > * {
+  scroll-snap-align: start;
+}
+
+.dur-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 10px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- poster card (meus cursos) ---------- */
+.poster-card {
+  position: relative;
+  flex: 0 0 218px;
+  aspect-ratio: 2 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: #000;
+  transition: 0.12s;
+}
+
+.poster-card:hover {
+  border-color: var(--text);
+  transform: translate(-3px, -3px);
+  box-shadow: 7px 7px 0 var(--hard);
+}
+
+.poster-card > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.poster-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, rgba(5, 7, 12, 0.95) 88%);
+}
+
+.poster-badge {
+  top: 10px;
+  left: 10px;
+}
+
+.poster-done {
+  top: 10px;
+}
+
+.poster-body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.poster-body h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.poster-teacher {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.poster-meta {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.poster-progress {
+  height: 5px;
+  margin-top: 4px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ---------- compact card (rows por categoria) ---------- */
+.compact-card {
+  flex: 0 0 212px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: 0.12s;
+}
+
+.compact-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: #000;
+  transition: 0.12s;
+}
+
+.compact-card:hover .compact-thumb {
+  border-color: var(--text);
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--hard);
+}
+
+.compact-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.compact-done {
+  top: 8px;
+  right: 8px;
+  padding: 3px 6px;
+}
+
+.compact-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.compact-meta {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.compact-disabled {
+  opacity: 0.55;
+}
+
+.compact-disabled .compact-meta {
+  color: #fbbf24;
+}
+
+/* ---------- hero: editar + professor ---------- */
+.hero-edit {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 var(--hard);
+  transition: 0.12s;
+}
+
+.hero-edit:hover {
+  border-color: var(--text);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--hard);
+}
+
+.hero-teacher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------- modal de edição ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 12, 0.75);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 8px 8px 0 var(--hard);
+  padding: 22px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.modal-close {
+  background: none;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  padding: 5px;
+  display: flex;
+  transition: 0.12s;
+}
+
+.modal-close:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.field input[type="text"],
+.field input:not([type]) {
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  padding: 9px 12px;
+  outline: none;
+  transition: 0.12s;
+}
+
+.field input:focus {
+  border-color: var(--accent);
+}
+
+.field-row {
+  display: flex;
+  gap: 14px;
+}
+
+.field-row .field {
+  flex: 1;
+}
+
+.banner-pick-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.banner-current {
+  position: relative;
+  flex: 0 0 240px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: #000;
+}
+
+.banner-current img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.banner-current.removing img {
+  opacity: 0.25;
+}
+
+.banner-current-label {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.banner-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 9px 16px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 var(--hard);
+  transition: 0.12s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--text);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--hard);
+}
+
+.remove-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.suggest-label {
+  margin-top: 12px;
+  display: block;
+}
+
+.suggest-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.suggest-thumb {
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  transition: 0.12s;
+}
+
+.suggest-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.suggest-thumb:hover {
+  border-color: var(--text);
+}
+
+.suggest-thumb.active {
+  border-color: var(--accent);
+  box-shadow: 3px 3px 0 var(--hard);
+  transform: translate(-2px, -2px);
+}
+
+.modal-error {
+  color: #f87171;
+  font-size: 13px;
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 /* ---------- legendas customizáveis (overlay próprio) ---------- */
 .sub-overlay {
   position: absolute;

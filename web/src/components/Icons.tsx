@@ -184,6 +184,32 @@ export const IconRefresh = (p: IconProps) => (
   </Svg>
 );
 
+export const IconPencil = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 20v-4L15.5 4.5a2.4 2.4 0 0 1 3.4 0l.6.6a2.4 2.4 0 0 1 0 3.4L8 20H4Z" />
+    <path d="m13.5 6.5 4 4" />
+  </Svg>
+);
+
+export const IconX = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 6l12 12M18 6 6 18" strokeWidth={3} />
+  </Svg>
+);
+
+export const IconUpload = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 15V4M6.5 9.5 12 4l5.5 5.5M4.5 20h15" />
+  </Svg>
+);
+
+export const IconUser = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4.5 20c1.5-3.5 4.2-5 7.5-5s6 1.5 7.5 5" />
+  </Svg>
+);
+
 export const IconTypography = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3" y="4.5" width="18" height="15" rx="2.5" />

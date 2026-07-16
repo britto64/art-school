@@ -54,6 +54,17 @@ CREATE TABLE IF NOT EXISTS subtitles (
   rel_path  TEXT NOT NULL
 );
 
+-- Metadados editados pelo usuário: como o progress, NUNCA é apagado no rescan.
+-- Campos NULL caem no valor derivado da pasta; banner é imagem customizada (upload ou frame escolhido)
+CREATE TABLE IF NOT EXISTS course_meta (
+  course_id TEXT PRIMARY KEY,
+  title     TEXT,
+  category  TEXT,
+  teacher     TEXT,
+  banner      BLOB,
+  banner_mime TEXT
+);
+
 -- Thumbnail de cada aula (JPEG pequeno, gerado sob demanda)
 CREATE TABLE IF NOT EXISTS lesson_thumbs (
   lesson_id TEXT PRIMARY KEY,

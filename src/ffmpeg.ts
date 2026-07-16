@@ -164,6 +164,34 @@ export async function getLessonThumb(lessonId: string): Promise<Uint8Array | nul
   }
 }
 
+/** Gera um frame em 640px de uma aula (para usar como banner do curso) */
+export async function generateFrameFromLesson(lessonId: string): Promise<Uint8Array | null> {
+  const lesson = db.prepare("SELECT rel_path, duration FROM lessons WHERE id = ?").get(lessonId) as
+    | { rel_path: string; duration: number | null }
+    | undefined;
+  if (!lesson) return null;
+  const videoAbs = path.join(config.coursesPath, lesson.rel_path);
+  if (!fs.existsSync(videoAbs)) return null;
+
+  const at = lesson.duration ? Math.min(lesson.duration * 0.2, 120) : 30;
+  const out = path.join(tmpDir(), `banner-${lessonId}.jpg`);
+  const args = (ss: number) => [
+    "-hide_banner", "-loglevel", "error",
+    "-ss", String(Math.floor(ss)),
+    "-i", videoAbs,
+    "-frames:v", "1",
+    "-vf", "scale=640:-2",
+    "-q:v", "4",
+    "-y", out
+  ];
+  let ok = await execFileP("ffmpeg", args(at), 60_000);
+  if (!ok || !fs.existsSync(out)) ok = await execFileP("ffmpeg", args(1), 60_000);
+  if (!ok || !fs.existsSync(out)) return null;
+  const img = fs.readFileSync(out);
+  fs.rmSync(out, { force: true });
+  return img;
+}
+
 // ---------- trickplay (preview da timeline) ----------
 
 const TP_COLS = 5;

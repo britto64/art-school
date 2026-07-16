@@ -2,11 +2,14 @@ export interface CourseSummary {
   id: string;
   title: string;
   category: string | null;
+  teacher: string | null;
   status: "ready" | "not_ready";
   hasBanner: boolean;
   lessonCount: number;
   completedCount: number;
+  sectionCount: number;
   totalDuration: number | null;
+  durationPartial: boolean;
   progressPct: number;
   lastWatched: string | null;
 }
@@ -58,7 +61,11 @@ export interface CourseDetail {
   id: string;
   title: string;
   category: string | null;
+  teacher: string | null;
   status: string;
+  folderTitle: string;
+  folderCategory: string | null;
+  hasCustomBanner: boolean;
   sections: { title: string | null; lessons: LessonRow[] }[];
   materials: MaterialRow[];
 }
@@ -91,6 +98,37 @@ export async function apiGet<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
+}
+
+export function saveCourseMeta(
+  courseId: string,
+  meta: { title: string; category: string; teacher: string }
+): Promise<Response> {
+  return fetch(`/api/courses/${courseId}/meta`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(meta)
+  });
+}
+
+export function uploadCourseBanner(courseId: string, file: File): Promise<Response> {
+  return fetch(`/api/courses/${courseId}/banner`, {
+    method: "POST",
+    headers: { "Content-Type": file.type || "image/jpeg" },
+    body: file
+  });
+}
+
+export function setBannerFromLesson(courseId: string, lessonId: string): Promise<Response> {
+  return fetch(`/api/courses/${courseId}/banner/from-lesson`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lessonId })
+  });
+}
+
+export function clearCourseBanner(courseId: string): Promise<Response> {
+  return fetch(`/api/courses/${courseId}/banner`, { method: "DELETE" });
 }
 
 export function saveProgress(lessonId: string, position: number, completed?: boolean): Promise<Response> {

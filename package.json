@@ -1,0 +1,26 @@
+{
+  "name": "art-school",
+  "version": "1.0.0",
+  "description": "Plataforma pessoal de cursos (estilo Jellyfin) — assista seus cursos em qualquer dispositivo",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "tsx watch src/index.ts",
+    "dev:web": "npm run dev --prefix web",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc",
+    "build:web": "npm run build --prefix web",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.23",
+    "@types/node": "^24.13.3",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

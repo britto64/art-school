@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiGet, fmtClock, PlayerData, saveProgress } from "../api";
+import { apiGet, CourseDetail, fmtClock, fmtDuration, fmtSize, PlayerData, saveProgress } from "../api";
 
 const SUB_PREF_KEY = "artschool.sublang";
 const AUTONEXT_KEY = "artschool.autonext";
@@ -13,6 +13,7 @@ export default function Player() {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<PlayerData | null>(null);
+  const [course, setCourse] = useState<CourseDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   // offset do remux: o <video> começa em 0, mas o tempo real é offset + currentTime
   const [offset, setOffset] = useState(0);
@@ -55,6 +56,12 @@ export default function Player() {
       .catch((e) => setError(String(e)));
   }, [id]);
 
+  // ---- curso (sidebar de aulas + materiais) ----
+  useEffect(() => {
+    if (!data?.course.id) return;
+    apiGet<CourseDetail>(`/api/courses/${data.course.id}`).then(setCourse).catch(() => {});
+  }, [data?.course.id, id]);
+
   const effTime = data?.directPlay ? curTime : offset + curTime;
   const duration = data?.duration ?? (videoDur > 0 && isFinite(videoDur) ? videoDur : 0);
 
@@ -65,13 +72,11 @@ export default function Player() {
   }, [data, offset]);
 
   // ---- progresso ----
-  const lastSaved = useRef(0);
   const save = useCallback(
     (completed?: boolean) => {
       if (!data) return;
       const pos = data.directPlay ? videoRef.current?.currentTime ?? 0 : offset + (videoRef.current?.currentTime ?? 0);
       void saveProgress(data.id, pos, completed);
-      lastSaved.current = Date.now();
     },
     [data, offset]
   );
@@ -113,7 +118,7 @@ export default function Player() {
     localStorage.setItem(RATE_KEY, String(rate));
   }, [rate, src]);
 
-  // ---- controles some após inatividade ----
+  // ---- controles somem após inatividade ----
   const poke = () => {
     setShowControls(true);
     clearTimeout(hideTimer.current);
@@ -139,9 +144,25 @@ export default function Player() {
     else v.pause();
   };
 
+  const markDoneLocal = () => {
+    // atualiza o ✓ na sidebar sem esperar refetch
+    setCourse((c) =>
+      c
+        ? {
+            ...c,
+            sections: c.sections.map((s) => ({
+              ...s,
+              lessons: s.lessons.map((l) => (l.id === data?.id ? { ...l, completed: 1 } : l))
+            }))
+          }
+        : c
+    );
+  };
+
   const onEnded = () => {
     if (!data) return;
     void saveProgress(data.id, duration || effTime, true);
+    markDoneLocal();
     if (autoNext && data.next) navigate(`/aula/${data.next.id}`);
   };
 
@@ -168,156 +189,229 @@ export default function Player() {
   if (error) return <div className="page center-msg">Erro ao carregar: {error}</div>;
   if (!data) return <div className="page center-msg">Carregando...</div>;
 
+  const totalLessons = course ? course.sections.reduce((n, s) => n + s.lessons.length, 0) : 0;
+
   return (
     <div className="player-page">
       <div className="player-topbar">
         <Link to={`/curso/${data.course.id}`} className="back-link">
-          ← {data.course.title}
+          ← Voltar para o curso
         </Link>
-        <div className="player-lesson-title">
-          {data.section ? `${data.section} · ` : ""}
-          <strong>{data.title}</strong>
+        <div className="topbar-nav">
+          <button
+            className="round-btn"
+            onClick={() => data.prev && navigate(`/aula/${data.prev.id}`)}
+            disabled={!data.prev}
+            title={data.prev ? `Anterior: ${data.prev.title}` : "Primeira aula"}
+          >
+            ‹
+          </button>
+          <button
+            className="round-btn"
+            onClick={() => data.next && navigate(`/aula/${data.next.id}`)}
+            disabled={!data.next}
+            title={data.next ? `Próxima: ${data.next.title}` : "Última aula"}
+          >
+            ›
+          </button>
         </div>
       </div>
 
-      <div
-        ref={wrapRef}
-        className={showControls ? "video-wrap" : "video-wrap hide-cursor"}
-        onMouseMove={poke}
-        onClick={poke}
-      >
-        <video
-          key={src}
-          ref={videoRef}
-          src={src}
-          autoPlay={effTime > 0 || playing}
-          crossOrigin="anonymous"
-          onClick={togglePlay}
-          onDoubleClick={toggleFullscreen}
-          onPlay={() => {
-            setPlaying(true);
-            poke();
-          }}
-          onPause={() => {
-            setPlaying(false);
-            save();
-            setShowControls(true);
-          }}
-          onTimeUpdate={(e) => setCurTime(e.currentTarget.currentTime)}
-          onLoadedMetadata={(e) => {
-            const v = e.currentTarget;
-            setVideoDur(v.duration);
-            v.volume = volume;
-            v.playbackRate = rate;
-            const resume = Number(v.dataset.resume ?? 0);
-            if (data.directPlay && resume > 0) {
-              v.currentTime = resume;
-              delete v.dataset.resume;
-            }
-          }}
-          onEnded={onEnded}
-        >
-          {data.subtitles.map((s) => (
-            <track key={s.id} kind="subtitles" label={s.lang} src={`/api/subtitles/${s.id}`} />
-          ))}
-        </video>
+      <div className="player-layout">
+        {/* ---- coluna esquerda: título + player + materiais ---- */}
+        <div className="player-main">
+          <h1 className="player-title">{data.title}</h1>
 
-        <div className={showControls ? "controls" : "controls controls-hidden"}>
-          <input
-            className="seekbar"
-            type="range"
-            min={0}
-            max={duration || 1}
-            step={0.1}
-            value={Math.min(effTime, duration || effTime)}
-            onChange={(e) => seek(Number(e.target.value))}
-          />
-          <div className="controls-row">
-            <div className="controls-left">
-              <button onClick={() => data.prev && navigate(`/aula/${data.prev.id}`)} disabled={!data.prev} title="Aula anterior">
-                ⏮
-              </button>
-              <button className="play-btn" onClick={togglePlay}>
-                {playing ? "⏸" : "▶"}
-              </button>
-              <button onClick={() => data.next && navigate(`/aula/${data.next.id}`)} disabled={!data.next} title="Próxima aula">
-                ⏭
-              </button>
-              <button onClick={() => seek(effTime - 10)} title="Voltar 10s">↺10</button>
-              <button onClick={() => seek(effTime + 10)} title="Avançar 10s">10↻</button>
-              <span className="time-label">
-                {fmtClock(effTime)} / {fmtClock(duration)}
-              </span>
-            </div>
-            <div className="controls-right">
-              {data.subtitles.length > 0 && (
-                <select
-                  value={subLang ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value || null;
-                    setSubLang(v);
-                    if (v) localStorage.setItem(SUB_PREF_KEY, v);
-                    else localStorage.removeItem(SUB_PREF_KEY);
-                  }}
-                  title="Legendas"
-                >
-                  <option value="">Sem legenda</option>
-                  {data.subtitles.map((s) => (
-                    <option key={s.id} value={s.lang}>
-                      {s.lang}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <select value={rate} onChange={(e) => setRate(Number(e.target.value))} title="Velocidade">
-                {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => (
-                  <option key={r} value={r}>
-                    {r}x
-                  </option>
-                ))}
-              </select>
+          <div
+            ref={wrapRef}
+            className={showControls ? "video-wrap" : "video-wrap hide-cursor"}
+            onMouseMove={poke}
+            onClick={poke}
+          >
+            <video
+              key={src}
+              ref={videoRef}
+              src={src}
+              autoPlay={effTime > 0 || playing}
+              crossOrigin="anonymous"
+              onClick={togglePlay}
+              onDoubleClick={toggleFullscreen}
+              onPlay={() => {
+                setPlaying(true);
+                poke();
+              }}
+              onPause={() => {
+                setPlaying(false);
+                save();
+                setShowControls(true);
+              }}
+              onTimeUpdate={(e) => setCurTime(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                setVideoDur(v.duration);
+                v.volume = volume;
+                v.playbackRate = rate;
+                const resume = Number(v.dataset.resume ?? 0);
+                if (data.directPlay && resume > 0) {
+                  v.currentTime = resume;
+                  delete v.dataset.resume;
+                }
+              }}
+              onEnded={onEnded}
+            >
+              {data.subtitles.map((s) => (
+                <track key={s.id} kind="subtitles" label={s.lang} src={`/api/subtitles/${s.id}`} />
+              ))}
+            </video>
+
+            <div className={showControls ? "controls" : "controls controls-hidden"}>
               <input
-                className="volume"
+                className="seekbar"
                 type="range"
                 min={0}
-                max={1}
-                step={0.05}
-                value={volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                title="Volume"
+                max={duration || 1}
+                step={0.1}
+                value={Math.min(effTime, duration || effTime)}
+                onChange={(e) => seek(Number(e.target.value))}
               />
-              <label className="autonext" title="Ir para a próxima aula automaticamente">
-                <input
-                  type="checkbox"
-                  checked={autoNext}
-                  onChange={(e) => {
-                    setAutoNext(e.target.checked);
-                    localStorage.setItem(AUTONEXT_KEY, e.target.checked ? "1" : "0");
-                  }}
-                />
-                Auto
-              </label>
-              <button onClick={toggleFullscreen} title="Tela cheia">⛶</button>
+              <div className="controls-row">
+                <div className="controls-left">
+                  <button onClick={() => data.prev && navigate(`/aula/${data.prev.id}`)} disabled={!data.prev} title="Aula anterior">
+                    ⏮
+                  </button>
+                  <button className="play-btn" onClick={togglePlay}>
+                    {playing ? "⏸" : "▶"}
+                  </button>
+                  <button onClick={() => data.next && navigate(`/aula/${data.next.id}`)} disabled={!data.next} title="Próxima aula">
+                    ⏭
+                  </button>
+                  <button onClick={() => seek(effTime - 10)} title="Voltar 10s">↺10</button>
+                  <button onClick={() => seek(effTime + 10)} title="Avançar 10s">10↻</button>
+                  <span className="time-label">
+                    {fmtClock(effTime)} / {fmtClock(duration)}
+                  </span>
+                </div>
+                <div className="controls-right">
+                  {data.subtitles.length > 0 && (
+                    <select
+                      value={subLang ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value || null;
+                        setSubLang(v);
+                        if (v) localStorage.setItem(SUB_PREF_KEY, v);
+                        else localStorage.removeItem(SUB_PREF_KEY);
+                      }}
+                      title="Legendas"
+                    >
+                      <option value="">Sem legenda</option>
+                      {data.subtitles.map((s) => (
+                        <option key={s.id} value={s.lang}>
+                          {s.lang}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <select value={rate} onChange={(e) => setRate(Number(e.target.value))} title="Velocidade">
+                    {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => (
+                      <option key={r} value={r}>
+                        {r}x
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="volume"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={volume}
+                    onChange={(e) => setVolume(Number(e.target.value))}
+                    title="Volume"
+                  />
+                  <label className="autonext" title="Ir para a próxima aula automaticamente">
+                    <input
+                      type="checkbox"
+                      checked={autoNext}
+                      onChange={(e) => {
+                        setAutoNext(e.target.checked);
+                        localStorage.setItem(AUTONEXT_KEY, e.target.checked ? "1" : "0");
+                      }}
+                    />
+                    Auto
+                  </label>
+                  <button onClick={toggleFullscreen} title="Tela cheia">⛶</button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="player-nav">
-        {data.prev ? (
-          <Link to={`/aula/${data.prev.id}`} className="nav-lesson">
-            ← {data.prev.title}
-          </Link>
-        ) : (
-          <span />
-        )}
-        {data.next ? (
-          <Link to={`/aula/${data.next.id}`} className="nav-lesson nav-next">
-            {data.next.title} →
-          </Link>
-        ) : (
-          <span />
-        )}
+          {/* ---- materiais embaixo do player ---- */}
+          {course && course.materials.length > 0 && (
+            <details className="section player-materials">
+              <summary>
+                <span className="section-title">📎 Material do curso</span>
+                <span className="section-meta">{course.materials.length} arquivos</span>
+              </summary>
+              <ul className="material-list">
+                {course.materials.map((m) => (
+                  <li key={m.id}>
+                    <a href={`/api/materials/${m.id}`} download>
+                      {m.name}
+                    </a>
+                    <span className="material-size">{fmtSize(m.size)}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+
+        {/* ---- coluna direita: aulas do curso ---- */}
+        <aside className="player-sidebar">
+          <div className="sidebar-header">
+            <div className="sidebar-course">{data.course.title}</div>
+            {totalLessons > 0 && <div className="sidebar-count">{totalLessons} aulas</div>}
+          </div>
+          <div className="sidebar-list">
+            {course?.sections.map((section, i) => {
+              const hasSections = course.sections.length > 1 || section.title !== null;
+              const containsCurrent = section.lessons.some((l) => l.id === data.id);
+              const list = (
+                <ul className="sidebar-lessons">
+                  {section.lessons.map((l) => {
+                    const isCurrent = l.id === data.id;
+                    return (
+                      <li key={l.id}>
+                        <Link
+                          to={`/aula/${l.id}`}
+                          className={isCurrent ? "sidebar-lesson current" : "sidebar-lesson"}
+                        >
+                          <span className={l.completed ? "lesson-icon done" : "lesson-icon"}>
+                            {l.completed ? "✓" : isCurrent ? "▶" : "▷"}
+                          </span>
+                          <span className="sidebar-lesson-title">{l.title}</span>
+                          <span className="sidebar-lesson-dur">{fmtDuration(l.duration)}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+              if (!hasSections) return <div key={i}>{list}</div>;
+              return (
+                <details key={i} className="sidebar-section" open={containsCurrent}>
+                  <summary>
+                    <span className="sidebar-section-title">{section.title ?? "Aulas"}</span>
+                    <span className="section-meta">
+                      {section.lessons.filter((l) => l.completed).length}/{section.lessons.length}
+                    </span>
+                  </summary>
+                  {list}
+                </details>
+              );
+            })}
+          </div>
+        </aside>
       </div>
     </div>
   );

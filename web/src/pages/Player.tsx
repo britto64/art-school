@@ -2,6 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiGet, CourseDetail, fmtClock, fmtDuration, PlayerData, saveProgress } from "../api";
 import Materials from "../components/Materials";
+import {
+  IconCheck,
+  IconChevronLeft,
+  IconChevronRight,
+  IconForward10,
+  IconFullscreen,
+  IconPause,
+  IconPlay,
+  IconPlayOutline,
+  IconRewind10,
+  IconSkipNext,
+  IconSkipPrev
+} from "../components/Icons";
 
 const SUB_PREF_KEY = "artschool.sublang";
 const AUTONEXT_KEY = "artschool.autonext";
@@ -213,7 +226,7 @@ export default function Player() {
             disabled={!data.prev}
             title={data.prev ? `Anterior: ${data.prev.title}` : "Primeira aula"}
           >
-            ‹
+            <IconChevronLeft size={18} />
           </button>
           <button
             className="round-btn"
@@ -221,7 +234,7 @@ export default function Player() {
             disabled={!data.next}
             title={data.next ? `Próxima: ${data.next.title}` : "Última aula"}
           >
-            ›
+            <IconChevronRight size={18} />
           </button>
         </div>
       </div>
@@ -236,7 +249,8 @@ export default function Player() {
               onClick={toggleWatched}
               title={data.completed ? "Marcar como não vista" : "Marcar como vista"}
             >
-              {data.completed ? "✓ Aula vista" : "Marcar como vista"}
+              <IconCheck size={14} />
+              {data.completed ? "Aula vista" : "Marcar como vista"}
             </button>
           </div>
 
@@ -295,16 +309,20 @@ export default function Player() {
               <div className="controls-row">
                 <div className="controls-left">
                   <button onClick={() => data.prev && navigate(`/aula/${data.prev.id}`)} disabled={!data.prev} title="Aula anterior">
-                    ⏮
+                    <IconSkipPrev size={19} />
                   </button>
-                  <button className="play-btn" onClick={togglePlay}>
-                    {playing ? "⏸" : "▶"}
+                  <button className="play-btn" onClick={togglePlay} title={playing ? "Pausar" : "Reproduzir"}>
+                    {playing ? <IconPause size={24} /> : <IconPlay size={24} />}
                   </button>
                   <button onClick={() => data.next && navigate(`/aula/${data.next.id}`)} disabled={!data.next} title="Próxima aula">
-                    ⏭
+                    <IconSkipNext size={19} />
                   </button>
-                  <button onClick={() => seek(effTime - 10)} title="Voltar 10s">↺10</button>
-                  <button onClick={() => seek(effTime + 10)} title="Avançar 10s">10↻</button>
+                  <button onClick={() => seek(effTime - 10)} title="Voltar 10s">
+                    <IconRewind10 size={21} />
+                  </button>
+                  <button onClick={() => seek(effTime + 10)} title="Avançar 10s">
+                    <IconForward10 size={21} />
+                  </button>
                   <span className="time-label">
                     {fmtClock(effTime)} / {fmtClock(duration)}
                   </span>
@@ -357,7 +375,9 @@ export default function Player() {
                     />
                     Auto
                   </label>
-                  <button onClick={toggleFullscreen} title="Tela cheia">⛶</button>
+                  <button onClick={toggleFullscreen} title="Tela cheia">
+                    <IconFullscreen size={19} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -388,7 +408,13 @@ export default function Player() {
                           className={isCurrent ? "sidebar-lesson current" : "sidebar-lesson"}
                         >
                           <span className={l.completed ? "lesson-icon done" : "lesson-icon"}>
-                            {l.completed ? "✓" : isCurrent ? "▶" : "▷"}
+                            {l.completed ? (
+                              <IconCheck size={13} />
+                            ) : isCurrent ? (
+                              <IconPlay size={12} />
+                            ) : (
+                              <IconPlayOutline size={12} />
+                            )}
                           </span>
                           <span className="sidebar-lesson-title">{l.title}</span>
                           <span className="sidebar-lesson-dur">{fmtDuration(l.duration)}</span>

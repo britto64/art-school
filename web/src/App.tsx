@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { IconRefresh, Logo } from "./components/Icons";
 
 export default function App() {
   const location = useLocation();
@@ -21,10 +22,14 @@ export default function App() {
       {!isPlayer && (
         <header className="topbar">
           <Link to="/" className="brand">
-            <span className="brand-icon">🎨</span> Art School
+            <Logo size={32} />
+            <span className="brand-text">
+              ART<em>SCHOOL</em>
+            </span>
           </Link>
           <button className="btn-ghost" onClick={rescan} disabled={scanning}>
-            {scanning ? "Escaneando..." : "⟳ Reescanear"}
+            <IconRefresh size={15} />
+            {scanning ? "Escaneando..." : "Reescanear"}
           </button>
         </header>
       )}

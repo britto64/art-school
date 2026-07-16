@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, fmtClock, fmtDuration, HomeData } from "../api";
+import { IconArchive, IconCheck, IconPlay } from "../components/Icons";
 
 export default function Home() {
   const [data, setData] = useState<HomeData | null>(null);
@@ -26,7 +27,9 @@ export default function Home() {
               <Link key={item.lessonId} to={`/aula/${item.lessonId}`} className="continue-card">
                 <div className="continue-thumb">
                   <img src={`/api/thumb/${item.courseId}`} alt="" loading="lazy" />
-                  <span className="play-badge">▶</span>
+                  <span className="play-badge">
+                    <IconPlay size={36} />
+                  </span>
                   {item.duration ? (
                     <div className="mini-progress">
                       <div style={{ width: `${Math.min(100, (item.position / item.duration) * 100)}%` }} />
@@ -55,7 +58,11 @@ export default function Home() {
               <div className="course-banner">
                 <img src={`/api/thumb/${c.id}`} alt={c.title} loading="lazy" />
                 {c.category && <span className="badge">{c.category}</span>}
-                {c.progressPct === 100 && <span className="badge badge-done">✓ Concluído</span>}
+                {c.progressPct === 100 && (
+                  <span className="badge badge-done">
+                    <IconCheck size={11} /> Concluído
+                  </span>
+                )}
               </div>
               <div className="course-card-body">
                 <h3>{c.title}</h3>
@@ -74,12 +81,14 @@ export default function Home() {
           {notReady.map((c) => (
             <div key={c.id} className="course-card course-card-disabled">
               <div className="course-banner banner-placeholder">
-                <span className="placeholder-icon">📦</span>
+                <span className="placeholder-icon">
+                  <IconArchive size={46} />
+                </span>
                 {c.category && <span className="badge">{c.category}</span>}
               </div>
               <div className="course-card-body">
                 <h3>{c.title}</h3>
-                <span className="not-ready-note">Não preparado — extraia os arquivos (.rar/.zip)</span>
+                <span className="not-ready-note">Não preparado: extraia os arquivos (.rar/.zip)</span>
               </div>
             </div>
           ))}

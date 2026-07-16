@@ -1,13 +1,22 @@
 :root {
-  --bg: #0e1014;
-  --bg-card: #171a21;
-  --bg-hover: #1e2230;
-  --text: #e8eaf0;
-  --text-dim: #8b91a3;
+  --bg: #14171f;
+  --bg-card: #1c202c;
+  --bg-hover: #252b3c;
+  --text: #edeff5;
+  --text-dim: #949bb0;
   --accent: #a78bfa;
   --accent-strong: #8b5cf6;
   --ok: #34d399;
-  --border: #262b38;
+  --border: #343d54;
+  --hard: #05070c; /* sombra dura */
+}
+
+/* ícones alinham com texto dentro de botões/links */
+button svg,
+a svg,
+.with-icon svg {
+  flex-shrink: 0;
+  display: block;
 }
 
 * {
@@ -47,27 +56,47 @@ button {
 }
 
 .brand {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
 }
 
-.brand-icon {
-  margin-right: 6px;
+.brand-text {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.brand-text em {
+  font-style: normal;
+  color: var(--accent);
 }
 
 .btn-ghost {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: 8px;
-  padding: 7px 14px;
-  transition: 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg-card);
+  border: 2px solid var(--text);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 15px;
+  font-weight: 700;
+  font-size: 13.5px;
+  box-shadow: 3px 3px 0 var(--hard);
+  transition: 0.12s;
 }
 
 .btn-ghost:hover {
-  color: var(--text);
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--hard);
   border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-ghost:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--hard);
 }
 
 .page {
@@ -102,13 +131,14 @@ button {
   background: var(--bg-card);
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--border);
-  transition: 0.15s;
+  border: 2px solid var(--border);
+  transition: 0.12s;
 }
 
 .continue-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
+  border-color: var(--text);
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--hard);
 }
 
 .continue-thumb {
@@ -130,9 +160,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 34px;
   color: #fff;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.3);
   opacity: 0;
   transition: 0.15s;
 }
@@ -188,18 +217,18 @@ button {
 
 .course-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
-  transition: 0.18s;
+  transition: 0.12s;
   display: flex;
   flex-direction: column;
 }
 
 .course-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  border-color: var(--text);
+  transform: translate(-3px, -3px);
+  box-shadow: 7px 7px 0 var(--hard);
 }
 
 .course-card-disabled {
@@ -227,23 +256,27 @@ button {
 }
 
 .placeholder-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  color: var(--text-dim);
+  opacity: 0.7;
 }
 
 .badge {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: rgba(14, 16, 20, 0.85);
-  border: 1px solid var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg);
+  border: 2px solid var(--accent);
   color: var(--accent);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   padding: 3px 9px;
   border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--hard);
 }
 
 .badge-done {
@@ -353,25 +386,43 @@ button {
 
 .btn-primary {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   background: var(--accent-strong);
   color: #fff;
-  font-weight: 600;
+  font-weight: 800;
   padding: 11px 22px;
   border-radius: 10px;
-  transition: 0.15s;
+  border: 2px solid var(--text);
+  box-shadow: 4px 4px 0 var(--hard);
+  transition: 0.12s;
 }
 
 .btn-primary:hover {
   background: var(--accent);
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 var(--hard);
+}
+
+.btn-primary:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--hard);
 }
 
 /* ---------- sections & lessons ---------- */
 .section {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   overflow: hidden;
+}
+
+.section-title.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .section summary {
@@ -420,14 +471,13 @@ button {
 }
 
 .lesson-check {
-  flex: 0 0 24px;
-  height: 24px;
+  flex: 0 0 26px;
+  height: 26px;
   margin-left: 10px;
   border-radius: 50%;
-  border: 1.5px solid var(--text-dim);
+  border: 2px solid var(--text-dim);
   background: none;
   color: var(--ok);
-  font-size: 13px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -506,7 +556,8 @@ button {
 
 .material-icon {
   flex-shrink: 0;
-  font-size: 16px;
+  color: var(--accent);
+  display: flex;
 }
 
 .material-name {
@@ -543,19 +594,31 @@ button {
 }
 
 .material-btn {
-  color: var(--accent);
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid var(--text);
+  border-radius: 8px;
   padding: 4px 10px;
   font-size: 12.5px;
-  font-weight: 600;
-  transition: 0.13s;
+  font-weight: 700;
+  box-shadow: 2px 2px 0 var(--hard);
+  transition: 0.12s;
   white-space: nowrap;
 }
 
 .material-btn:hover {
   border-color: var(--accent);
-  background: rgba(139, 92, 246, 0.1);
+  color: var(--accent);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--hard);
+}
+
+.material-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0 var(--hard);
 }
 
 @media (max-width: 640px) {
@@ -592,28 +655,37 @@ button {
 }
 
 .round-btn {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: 1px solid var(--border);
+  border: 2px solid var(--text);
   background: var(--bg-card);
   color: var(--text);
-  font-size: 20px;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: 0.15s;
+  box-shadow: 3px 3px 0 var(--hard);
+  transition: 0.12s;
 }
 
 .round-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--hard);
+}
+
+.round-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--hard);
 }
 
 .round-btn:disabled {
   opacity: 0.35;
   cursor: default;
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 /* ---- layout duas colunas: player | aulas ---- */
@@ -647,24 +719,35 @@ button {
 
 .btn-watched {
   flex-shrink: 0;
-  background: none;
-  border: 1.5px solid var(--border);
-  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg-card);
+  border: 2px solid var(--text);
+  color: var(--text);
   border-radius: 999px;
   padding: 8px 16px;
   font-size: 13px;
-  font-weight: 600;
-  transition: 0.15s;
+  font-weight: 700;
+  box-shadow: 3px 3px 0 var(--hard);
+  transition: 0.12s;
 }
 
 .btn-watched:hover {
   border-color: var(--ok);
   color: var(--ok);
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--hard);
+}
+
+.btn-watched:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--hard);
 }
 
 .btn-watched.active {
   border-color: var(--ok);
-  background: rgba(52, 211, 153, 0.12);
+  background: rgba(52, 211, 153, 0.14);
   color: var(--ok);
 }
 
@@ -769,8 +852,8 @@ button {
 
 .lesson-icon {
   flex: 0 0 18px;
-  text-align: center;
-  font-size: 13px;
+  display: flex;
+  justify-content: center;
   color: var(--text-dim);
 }
 
@@ -899,9 +982,11 @@ button {
   background: none;
   border: none;
   color: #fff;
-  font-size: 17px;
-  padding: 5px 8px;
-  border-radius: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: 0.12s;
 }
 
@@ -915,7 +1000,12 @@ button {
 }
 
 .play-btn {
-  font-size: 22px !important;
+  background: var(--accent-strong) !important;
+  border: 2px solid #fff !important;
+  border-radius: 50% !important;
+  width: 44px;
+  height: 44px;
+  box-shadow: 2px 2px 0 var(--hard);
 }
 
 .time-label {
@@ -926,12 +1016,13 @@ button {
 }
 
 .controls select {
-  background: rgba(20, 22, 30, 0.9);
+  background: rgba(20, 22, 30, 0.92);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 8px;
   padding: 4px 6px;
   font-size: 12.5px;
+  font-weight: 700;
 }
 
 .volume {

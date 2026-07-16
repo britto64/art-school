@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiGet, CourseDetail, fmtDuration, saveProgress } from "../api";
 import Materials from "../components/Materials";
+import { IconCheck, IconPlay } from "../components/Icons";
 
 export default function Course() {
   const { id } = useParams<{ id: string }>();
@@ -48,7 +49,8 @@ export default function Course() {
           </div>
           {continueLesson && (
             <Link to={`/aula/${continueLesson.id}`} className="btn-primary">
-              {done === 0 ? "▶ Começar curso" : pct === 100 ? "▶ Rever curso" : "▶ Continuar de onde parou"}
+              <IconPlay size={15} />
+              {done === 0 ? "Começar curso" : pct === 100 ? "Rever curso" : "Continuar de onde parou"}
             </Link>
           )}
         </div>
@@ -73,7 +75,7 @@ export default function Course() {
                     title={l.completed ? "Marcar como não assistida" : "Marcar como assistida"}
                     onClick={() => toggleComplete(l.id, l.position, !l.completed)}
                   >
-                    {l.completed ? "✓" : ""}
+                    {l.completed ? <IconCheck size={13} /> : null}
                   </button>
                   <Link to={`/aula/${l.id}`} className="lesson-link">
                     <span className="lesson-title">{l.title}</span>
